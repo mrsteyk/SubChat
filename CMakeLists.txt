@@ -58,6 +58,7 @@ add_executable(${PROJECT_NAME}
         ${IMGUI_DIR}/imgui_tables.cpp
         ${IMGUI_DIR}/imgui_widgets.cpp
         ${IMGUI_DIR}/misc/freetype/imgui_freetype.cpp
+        ${IMGUI_DIR}/misc/cpp/imgui_stdlib.cpp
         ${TINYXML_DIR}/tinyxml2.cpp
 
 

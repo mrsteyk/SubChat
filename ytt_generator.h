@@ -146,6 +146,10 @@ enum class EdgeType {
     None, HardShadow, Bevel, GlowOutline, SoftShadow
 };
 
+enum class TextAlignment {
+    Left, Right, Center
+};
+
 //--------------------------------------------
 // Conversion helpers for enum values to strings
 //--------------------------------------------
@@ -199,6 +203,19 @@ std::string toString(EdgeType edge) {
     }
 }
 
+std::string toString(TextAlignment alignment) {
+    switch (alignment) {
+        case TextAlignment::Left:
+            return "1";
+        case TextAlignment::Right:
+            return "2";
+        case TextAlignment::Center:
+            return "3";
+        default:
+            return "";
+    }
+}
+
 //--------------------------------------------
 // Data structures for chat messages and batches
 //--------------------------------------------
@@ -247,11 +264,10 @@ struct ChatParams {
 
     // Font settings
     FontStyle fontStyle = FontStyle::SansSerif; // default pen-fs: "3"
-    u_char fontSizePercentage = 0;               // default font scale from Python (default: 0)
+    u_char fontSizePercentage = 0;              // default font scale from Python (default: 0)
 
     // Positioning options
-    // Instead of using horizontalAlignment for workspace "ju", we use a parameter:
-    std::string wsJu = "0";                   // workspace ju property (default "0")
+    TextAlignment textAlignment = TextAlignment::Left;                   // workspace ju property (default "0")
     int horizontalMargin = 71;                // margin (default: 71)
     int verticalSpacing = 4;                  // space between lines (default: 4)
     int totalDisplayLines = 11;               // maximum number of lines on screen
@@ -407,7 +423,7 @@ std::string generateXML(const std::vector<ChatMessage> &messages, const ChatPara
     XMLElement *ws = doc.NewElement("ws");
     ws->SetAttribute("id", "1"); // default workspace id
     // Use wsJu parameter instead of horizontalAlignment conversion.
-    ws->SetAttribute("ju", params.wsJu.c_str());
+    ws->SetAttribute("ju", toString(params.textAlignment).c_str());
     head->InsertEndChild(ws);
 
     // Create write positioning (wp) elements.
@@ -436,7 +452,7 @@ std::string generateXML(const std::vector<ChatMessage> &messages, const ChatPara
             pElem->SetAttribute("ws", "1");
             pElem->SetAttribute("p", defaultPen.c_str());
 
-            pElem->LinkEndChild(doc.NewText(ZWSP));
+            pElem->LinkEndChild(doc.NewText(""));
             if (line.user.has_value()) {
                 XMLElement *sUser = doc.NewElement("s");
                 sUser->SetAttribute("p", colors[line.user->color].c_str());
@@ -450,7 +466,7 @@ std::string generateXML(const std::vector<ChatMessage> &messages, const ChatPara
             sText->SetAttribute("p", defaultPen.c_str());
             sText->SetText(line.text.c_str());
             pElem->InsertEndChild(sText);
-            pElem->LinkEndChild(doc.NewText(ZWSP));
+            pElem->LinkEndChild(doc.NewText(""));
 
             body->InsertEndChild(pElem);
         }

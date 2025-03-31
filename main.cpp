@@ -13,6 +13,7 @@
 #include <GLFW/glfw3.h>
 
 #include "image_view.h"
+#include "misc/cpp/imgui_stdlib.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 
@@ -114,7 +115,6 @@ void ShowDockSpace() {
 
 int main(int, char **) {
     test();
-    return 0;
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit())
         return 1;
@@ -148,7 +148,7 @@ int main(int, char **) {
     int my_image_width = 0;
     int my_image_height = 0;
     GLuint my_image_texture = 0;
-    bool ret = LoadTextureFromFile("../sample.jpg", &my_image_texture, &my_image_width, &my_image_height);
+    bool ret = LoadTextureFromFile("../sample_t.png", &my_image_texture, &my_image_width, &my_image_height);
     IM_ASSERT(ret);
 
     // Variables to store our fixed dock node IDs.
@@ -181,10 +181,11 @@ int main(int, char **) {
             //ImGui::SetNextWindowDockID(helloDockID, ImGuiCond_Always);
             ImGui::Begin("Привет, Мир!");
             ImGui::Text("This is some useful text.");
-            ImGui::SliderFloat("font size", &text_overlay.fontSizeFactor, 16.0f, 240.0f);
-            ImGui::SliderFloat("font X", &text_overlay.relX, 0.0f, 1.0f);
-            ImGui::SliderFloat("font Y", &text_overlay.relY, 0.0f, 1.0f);
-
+            ImGui::SliderInt("virtualFontSize", &text_overlay.virtualFontSize, 0, 300);
+            ImGui::SliderInt("font X", &text_overlay.virtualX, 0, 100);
+            ImGui::SliderInt("font Y", &text_overlay.virtualY, 0, 100);
+            ImGui::InputFloat("pixelsMultY", &text_overlay.pixelsMultY,0.01);
+            ImGui::InputText("Text", &text_overlay.text);
             // (Add any additional hello world UI elements here)
             if (ImGui::Button("Open")) {
                 show_image_window = true;
