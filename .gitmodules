@@ -3,7 +3,7 @@
 	url = https://github.com/glfw/glfw.git
 [submodule "submodules/imgui"]
 	path = submodules/imgui
-	url = https://github.com/Kam1k4dze/imgui
+	url = https://github.com/ocornut/imgui
 	branch = docking
 [submodule "submodules/tinyxml2"]
 	path = submodules/tinyxml2

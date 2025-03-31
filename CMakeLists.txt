@@ -8,8 +8,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Find OpenGL
 find_package(OpenGL REQUIRED)
 
-find_package(Freetype REQUIRED)
-
 # Find GLEW
 find_package(GLEW REQUIRED)
 
@@ -41,9 +39,6 @@ set(UTFCPP_DIR "${CMAKE_SOURCE_DIR}/submodules/utfcpp/source")
 include_directories(${UTFCPP_DIR})
 
 
-
-include_directories(${FREETYPE_INCLUDE_DIRS})
-
 # Gather source files
 file(GLOB sources "${CMAKE_SOURCE_DIR}/*.cpp")
 
@@ -57,7 +52,6 @@ add_executable(${PROJECT_NAME}
         ${IMGUI_DIR}/imgui_demo.cpp
         ${IMGUI_DIR}/imgui_tables.cpp
         ${IMGUI_DIR}/imgui_widgets.cpp
-        ${IMGUI_DIR}/misc/freetype/imgui_freetype.cpp
         ${IMGUI_DIR}/misc/cpp/imgui_stdlib.cpp
         ${TINYXML_DIR}/tinyxml2.cpp
 
@@ -65,4 +59,4 @@ add_executable(${PROJECT_NAME}
 )
 
 # Link with GLFW, OpenGL and GLEW
-target_link_libraries(${PROJECT_NAME} glfw OpenGL::GL GLEW::GLEW Freetype::Freetype)
+target_link_libraries(${PROJECT_NAME} glfw OpenGL::GL GLEW::GLEW)
