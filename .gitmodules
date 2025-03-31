@@ -1,0 +1,13 @@
+[submodule "submodules/imgui"]
+	path = submodules/imgui
+	url = https://github.com//ocornut/imgui
+	branch = docking
+[submodule "submodules/tinyxml2"]
+	path = submodules/tinyxml2
+	url = https://github.com/leethomason/tinyxml2
+[submodule "submodules/utfcpp"]
+	path = submodules/utfcpp
+	url = https://github.com/nemtrif/utfcpp
+[submodule "submodules/glfw"]
+	path = submodules/glfw
+	url = https://github.com/glfw/glfw.git
