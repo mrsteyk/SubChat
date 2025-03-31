@@ -5,3 +5,6 @@
 	path = submodules/imgui
 	url = https://github.com/Kam1k4dze/imgui
 	branch = docking
+[submodule "submodules/tinyxml2"]
+	path = submodules/tinyxml2
+	url = https://github.com/leethomason/tinyxml2
