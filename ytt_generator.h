@@ -12,6 +12,30 @@
 #include <iterator>
 #include <queue>
 #include <ranges>
+#include "utf8.h"
+
+//--------------------------------------------
+// Helper functions for UTF-8 string operations
+//--------------------------------------------
+
+/** Returns the Unicode (code point) length of a UTF-8 encoded std::string. */
+int utf8_length(const std::string &s) {
+    return static_cast<int>(utf8::distance(s.begin(), s.end()));
+}
+
+/** Returns a substring (in UTF-8) of the given string starting at code point offset 0
+ *  and spanning at most count Unicode code points.
+ */
+std::string utf8_substr(const std::string &s, int count) {
+    auto it = s.begin();
+    int i = 0;
+    while (it != s.end() && i < count) {
+        utf8::next(it, s.end());
+        ++i;
+    }
+    return std::string(s.begin(), it);
+}
+
 
 //--------------------------------------------
 // Color type with implicit string conversion and RGB storage
@@ -250,41 +274,50 @@ std::vector<std::string> wrapText(const std::string &text, int maxChars, int pre
 
     while (iss >> word) {
         int currentMaxChars = isFirstLine ? firstLineMaxChars : maxChars;
+        int lineLen = utf8_length(line);
+        int wordLen = utf8_length(word);
 
-        if (!line.empty() && line.size() + 1 + word.size() > static_cast<size_t>(currentMaxChars)) {
+        // If adding the word (with a space) would exceed current line limit
+        if (!line.empty() && (lineLen + 1 + wordLen > currentMaxChars)) {
             lines.push_back(line);
             line.clear();
             isFirstLine = false;
         }
 
-        if (word.size() > static_cast<size_t>(currentMaxChars)) {
-            size_t start = 0;
-            size_t length = std::min(static_cast<size_t>(currentMaxChars), word.size() - start);
-            lines.push_back(word.substr(start, length));
-            start += length;
-            currentMaxChars = maxChars;
-            isFirstLine = false;
-            while (start < word.size()) {
-                size_t length = std::min(static_cast<size_t>(currentMaxChars), word.size() - start);
-                lines.push_back(word.substr(start, length));
-                start += length;
+        // If the word itself is too long, break it up.
+        if (wordLen > currentMaxChars) {
+            // If there is a partial line already, push it out.
+            if (!line.empty()) {
+                lines.push_back(line);
+                line.clear();
+                isFirstLine = false;
+            }
+            auto wordIt = word.begin();
+            while (wordIt != word.end()) {
+                auto startIt = wordIt;
+                int count = 0;
+                // Advance wordIt by at most currentMaxChars code points.
+                while (wordIt != word.end() && count < currentMaxChars) {
+                    utf8::next(wordIt, word.end());
+                    ++count;
+                }
+                lines.push_back(std::string(startIt, wordIt));
+                currentMaxChars = maxChars;  // after the first broken piece, use full line limit
+                isFirstLine = false;
             }
             continue;
         }
 
         if (!line.empty()) {
-            line += " ";
+            line.append(" ");
         }
-        line += word;
+        line.append(word);
     }
 
-    if (!line.empty()) {
+    if (!line.empty())
         lines.push_back(line);
-    }
-
     return lines;
 }
-
 
 //--------------------------------------------
 // Function: generateXML
@@ -295,40 +328,32 @@ std::string generateXML(const std::vector<ChatMessage> &messages, const ChatPara
     using namespace tinyxml2;
     XMLDocument doc;
 
-    // Build mapping for unique colors (include default fallback).
-    // Using Color as map key directly
     std::map<Color, std::string> colors;
-    // Default color for users (if none is provided) is white.
     colors[params.textForegroundColor] = "";
-
     for (const auto &m: messages) {
         colors[m.user.color] = "";
     }
 
-    // Build batches: accumulate wrapped chat lines.
     std::vector<Batch> batches;
     std::deque<ChatLine> currentLines;
     for (const auto &msg: messages) {
         std::string username = msg.user.name;
         std::string prefix = username + params.usernameSeparator;
 
-        if (prefix.size() > params.maxCharsPerLine) {
-            size_t charsToKeep = params.maxCharsPerLine - params.usernameSeparator.size();
-
-            if (charsToKeep > username.size()) {
-                charsToKeep = username.size();
-            }
-            username.erase(charsToKeep);
+        // Instead of using username.size(), use UTF-8 code point count.
+        if (utf8_length(prefix) > params.maxCharsPerLine) {
+            int charsToKeep = params.maxCharsPerLine - utf8_length(params.usernameSeparator);
+            if (charsToKeep < 0) charsToKeep = 0;
+            username = utf8_substr(username, charsToKeep);
+            prefix = username + params.usernameSeparator;
         }
 
-        auto wrapped = wrapText(msg.message, params.maxCharsPerLine, prefix.size());
+        auto wrapped = wrapText(msg.message, params.maxCharsPerLine, utf8_length(prefix));
         if (wrapped.empty())
             continue;
 
-
         currentLines.emplace_back(std::make_optional<User>(username, msg.user.color), wrapped[0]);
         if (currentLines.size() > params.totalDisplayLines) currentLines.pop_front();
-        // For subsequent lines, leave user and color empty.
         for (size_t i = 1; i < wrapped.size(); ++i) {
             currentLines.emplace_back(std::nullopt, wrapped[i]);
             if (currentLines.size() > params.totalDisplayLines) currentLines.pop_front();

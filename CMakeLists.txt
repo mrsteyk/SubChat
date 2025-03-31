@@ -37,6 +37,11 @@ include_directories(${IMGUI_DIR} ${IMGUI_DIR}/backends)
 set(TINYXML_DIR "${CMAKE_SOURCE_DIR}/submodules/tinyxml2")
 include_directories(${TINYXML_DIR})
 
+set(UTFCPP_DIR "${CMAKE_SOURCE_DIR}/submodules/utfcpp/source")
+include_directories(${UTFCPP_DIR})
+
+
+
 include_directories(${FREETYPE_INCLUDE_DIRS})
 
 # Gather source files
