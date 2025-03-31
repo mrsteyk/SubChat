@@ -184,7 +184,7 @@ int main(int, char **) {
             ImGui::SliderInt("virtualFontSize", &text_overlay.virtualFontSize, 0, 300);
             ImGui::SliderInt("font X", &text_overlay.virtualX, 0, 100);
             ImGui::SliderInt("font Y", &text_overlay.virtualY, 0, 100);
-            ImGui::InputFloat("pixelsMultY", &text_overlay.pixelsMultY,0.01);
+            ImGui::InputFloat("pixelsMultY", &text_overlay.pixelsMultY,0.001);
             ImGui::InputText("Text", &text_overlay.text);
             // (Add any additional hello world UI elements here)
             if (ImGui::Button("Open")) {

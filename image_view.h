@@ -5,6 +5,7 @@
 #include <cmath>
 #include <string>
 #include <vector>
+#include "ytt_generator.h"
 
 // Global font pointer.
 static ImFont *g_font = nullptr;
@@ -39,16 +40,17 @@ struct InteractiveTextOverlay {
     }
 
     float realY(int N=0) const {
-        return (((virtualY+virtualDistanceBetweenLines*N) * 0.86f) + 2.5f) / 100.0f;
+        return (((virtualY+N*virtualDistanceBetweenLines) * 0.96f) + 2.15f) / 100.0f;
     }
 
 
     int charsPerLine = 10;
     int LinesCount = 10;
-    int virtualDistanceBetweenLines = 5;
+    int virtualDistanceBetweenLines = 4;
     // Added customizable text
     std::string text = "kamikadze1:";
-    std::vector<std::string> texts = {"MNOPQR","kam1k4dze:","MNOPQR"};
+    std::vector<std::string> texts = {"kam1k4dze1:ABCDEFGHIJKL","MNOPQRSTUVWXYZ","kam1k4dze1:АБВГ","MNOPQRSTUVWXYZ","electricalneo:hello","afterschoolchan:Why do","slop today?",
+                                      "tonitch:hello :D"};
 };
 
 
@@ -114,9 +116,8 @@ inline void ShowInteractiveImage(
     ImVec2 textSize(baseTextSize.x * textScale, baseTextSize.y * textScale);
 
     // Render the text.
-    for (int i = 0; i < 3; i++) {
-        ImVec2 textPos ={imgPos.x + overlay->realX() * imageSize.x, imgPos.y + overlay->realY(i) * imageSize.y};
-        ImGui::GetWindowDrawList()->AddText(g_font, desiredFontSize, textPos, IM_COL32(255, 255, 255, 255), overlay->texts[i].c_str());
+    for (int i = 0; i < 8; i++) {
+        ImGui::GetWindowDrawList()->AddText(g_font, desiredFontSize, {imgPos.x + overlay->realX() * imageSize.x, imgPos.y + overlay->realY(i) * imageSize.y}, IM_COL32(255, 255, 255, 255), overlay->texts[i].c_str());
     }
     ImGui::PopFont();
 
