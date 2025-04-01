@@ -86,7 +86,6 @@ void LoadFonts(float dpi_scale) {
     io.Fonts->Clear();
     io.Fonts->AddFontFromFileTTF("../fonts/lucon.ttf", 16.0f * dpi_scale, nullptr, io.Fonts->GetGlyphRangesCyrillic());
     io.Fonts->Build();
-
 }
 
 void ApplyDPIStyles(float dpi_scale) {
@@ -184,11 +183,17 @@ int main(int, char **) {
             ImGui::SliderInt("virtualFontSize", &text_overlay.virtualFontSize, 0, 300);
             ImGui::SliderInt("font X", &text_overlay.virtualX, 0, 100);
             ImGui::SliderInt("font Y", &text_overlay.virtualY, 0, 100);
-            ImGui::InputFloat("pixelsMultY", &text_overlay.pixelsMultY,0.001);
-            ImGui::InputText("Text", &text_overlay.text);
+            ImGui::SliderInt("LineSpaceY", &text_overlay.virtualDistanceBetweenLines,0,25);
+
+            bool revalidate = ImGui::SliderInt("LineCount", &text_overlay.LinesCount,1,50);
+            revalidate = revalidate || ImGui::SliderInt("charsPerLine", &text_overlay.charsPerLine,5,50);
+            if (revalidate){
+                text_overlay.generatePreview();
+            }
             // (Add any additional hello world UI elements here)
             if (ImGui::Button("Open")) {
                 show_image_window = true;
+                text_overlay.generatePreview();
             }
             ImGui::End();
         }

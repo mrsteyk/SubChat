@@ -1,4 +1,5 @@
 #pragma once
+
 #include "tinyxml2.h"
 #include <string>
 #include <vector>
@@ -271,10 +272,10 @@ struct ChatParams {
     TextAlignment textAlignment = TextAlignment::Left;                   // workspace ju property (default "0")
     int horizontalMargin = 71;                // margin (default: 71)
     int verticalSpacing = 4;                  // space between lines (default: 4)
-    int totalDisplayLines = 11;               // maximum number of lines on screen
+    int totalDisplayLines = 13;               // maximum number of lines on screen
 
     // Batch and wrapping options
-    int maxCharsPerLine = 23;                 // maximum characters per line before wrapping
+    int maxCharsPerLine = 25;                 // maximum characters per line before wrapping
     std::string usernameSeparator = ":";      // separator between username and message
 };
 
@@ -318,7 +319,7 @@ std::vector<std::string> wrapText(const std::string &text, int maxChars, int pre
                     utf8::next(wordIt, word.end());
                     ++count;
                 }
-                lines.push_back(std::string(startIt, wordIt));
+                lines.emplace_back(startIt, wordIt);
                 currentMaxChars = maxChars;  // after the first broken piece, use full line limit
                 isFirstLine = false;
             }
@@ -334,6 +335,19 @@ std::vector<std::string> wrapText(const std::string &text, int maxChars, int pre
     if (!line.empty())
         lines.push_back(line);
     return lines;
+}
+
+std::vector<std::string> wrapMessage(std::string &username,
+                                     const std::string &usernameSeparator,
+                                     const std::string &message,
+                                     int maxCharsPerLine) {
+    if (utf8_length(username) > maxCharsPerLine) {
+        int charsToKeep = maxCharsPerLine - utf8_length(usernameSeparator);
+        if (charsToKeep < 0) charsToKeep = 0;
+        username = utf8_substr(username, charsToKeep);
+
+    }
+    return wrapText(usernameSeparator + message, maxCharsPerLine, utf8_length(username));;
 }
 
 //--------------------------------------------
@@ -355,17 +369,7 @@ std::string generateXML(const std::vector<ChatMessage> &messages, const ChatPara
     std::deque<ChatLine> currentLines;
     for (const auto &msg: messages) {
         std::string username = msg.user.name;
-        std::string prefix = username + params.usernameSeparator;
-
-        // Instead of using username.size(), use UTF-8 code point count.
-        if (utf8_length(prefix) > params.maxCharsPerLine) {
-            int charsToKeep = params.maxCharsPerLine - utf8_length(params.usernameSeparator);
-            if (charsToKeep < 0) charsToKeep = 0;
-            username = utf8_substr(username, charsToKeep);
-            prefix = username + params.usernameSeparator;
-        }
-
-        auto wrapped = wrapText(msg.message, params.maxCharsPerLine, utf8_length(prefix));
+        auto wrapped = wrapMessage(username, params.usernameSeparator, msg.message, params.maxCharsPerLine);
         if (wrapped.empty())
             continue;
 
@@ -457,7 +461,7 @@ std::string generateXML(const std::vector<ChatMessage> &messages, const ChatPara
             if (line.user.has_value()) {
                 XMLElement *sUser = doc.NewElement("s");
                 sUser->SetAttribute("p", colors[line.user->color].c_str());
-                std::string userText = line.user->name + params.usernameSeparator;
+                std::string userText = line.user->name;
                 sUser->SetText(userText.c_str());
                 pElem->InsertEndChild(sUser);
                 pElem->LinkEndChild(doc.NewText(ZWSP));
@@ -478,6 +482,16 @@ std::string generateXML(const std::vector<ChatMessage> &messages, const ChatPara
     return printer.CStr();
 }
 
+
+Color getRandomColor(const std::string &username) {
+    std::vector<Color> defaultColors = {"#ff0000", "#0000ff", "#008000", "#b22222", "#ff7f50",
+                                        "#9acd32", "#ff4500", "#2e8b57", "#daa520", "#d2691e",
+                                        "#5f9ea0", "#1e90ff", "#ff69b4", "#8a2be2", "#00ff7f"};
+    std::hash<std::string> hasher;
+    return defaultColors[hasher(username) % defaultColors.size()];
+
+}
+
 //--------------------------------------------
 // CSV parser function: parses CSV files with header fields
 // ("time", "user_name", "user_color", "message").
@@ -487,9 +501,7 @@ std::vector<ChatMessage> parseCSV(const std::string &filename) {
     std::vector<ChatMessage> messages;
     std::ifstream file(filename);
     std::string line;
-    std::vector<Color> defaultColors = {"#ff0000", "#0000ff", "#008000", "#b22222", "#ff7f50",
-                                        "#9acd32", "#ff4500", "#2e8b57", "#daa520", "#d2691e",
-                                        "#5f9ea0", "#1e90ff", "#ff69b4", "#8a2be2", "#00ff7f"};
+
     std::hash<std::string> hasher;
     if (!file.is_open()) {
         std::cerr << "Error: Could not open file " << filename << "\n";
@@ -513,8 +525,7 @@ std::vector<ChatMessage> parseCSV(const std::string &filename) {
 
         // Parse color: if empty, use "#ffffff"
         std::getline(ss, field, ',');
-        const auto &randomColor = defaultColors[hasher(msg.user.name) % defaultColors.size()];
-        msg.user.color = field.empty() ? randomColor : Color(field);
+        msg.user.color = field.empty() ? getRandomColor(msg.user.name) : Color(field);
 
         // Parse message (the rest of the line)
         std::getline(ss, msg.message);
