@@ -4,7 +4,7 @@ SubChat is a command-line and GUI toolset for generating YouTube subtitles from 
 
 **IMPORTANT:** Currently only desktop browser YouTube is supported.
 
-![Tsoding](example/result.png)
+![Tsoding](example/result.jpg)
 Chat on this screenshot was created entirely using YouTube subtitles.
 
 Screenshot from [Tsoding](https://www.twitch.tv/tsoding) stream.
@@ -111,6 +111,7 @@ Launch this tool to generate or modify INI config files:
 ```bash
 ./config_generator_gui
 ```
+![GUI Interface](example/gui.jpg)
 
 ### subtitles_generator
 
