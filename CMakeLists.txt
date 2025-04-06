@@ -31,7 +31,7 @@ add_subdirectory("${CMAKE_SOURCE_DIR}/submodules/csv-parser")
 add_subdirectory("${CMAKE_SOURCE_DIR}/submodules/CLI11")
 
 add_executable(subtitles_generator
-        ytt_generator.cpp
+        cli_main.cpp
         ${TINYXML_DIR}/tinyxml2.cpp
 )
 target_include_directories(subtitles_generator
@@ -84,7 +84,7 @@ if (BUILD_GUI)
             ${IMGUI_DIR}/imgui_widgets.cpp
             ${IMGUI_DIR}/misc/cpp/imgui_stdlib.cpp
             ${TINYXML_DIR}/tinyxml2.cpp
-            main.cpp
+            gui_main.cpp
             fonts/lucon.hpp
     )
 
