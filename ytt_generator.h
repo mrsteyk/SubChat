@@ -1,6 +1,10 @@
 #pragma once
 
-#include "tinyxml2.h"
+#include <iostream>
+#include <sstream>
+#include <iomanip>
+#include <string>
+#include <algorithm>
 #include <string>
 #include <vector>
 #include <map>
@@ -15,19 +19,15 @@
 #include <queue>
 #include <ranges>
 #include "utf8.h"
+#include "tinyxml2.h"
+#include "SimpleIni.h"
+#include "magic_enum.hpp"
 
-//--------------------------------------------
-// Helper functions for UTF-8 string operations
-//--------------------------------------------
 
-/** Returns the Unicode (code point) length of a UTF-8 encoded std::string. */
 int utf8_length(const std::string &s) {
     return static_cast<int>(utf8::distance(s.begin(), s.end()));
 }
 
-/** Returns a substring (in UTF-8) of the given string starting at code point offset 0
- *  and spanning at most count Unicode code points.
- */
 std::string utf8_substr(const std::string &s, int count) {
     auto it = s.begin();
     int i = 0;
@@ -38,12 +38,35 @@ std::string utf8_substr(const std::string &s, int count) {
     return std::string(s.begin(), it);
 }
 
+template<typename T, T Max>
+struct Clamped {
+    T value;
 
-//--------------------------------------------
-// Color type with implicit string conversion and RGB storage
-//--------------------------------------------
+    Clamped(T v = 0) : value(clamp(v)) {}
+
+    static T clamp(T v) {
+        return (v > Max) ? Max : v;
+    }
+
+    operator T() const {
+        return value;
+    }
+
+    Clamped &operator=(T v) {
+        value = clamp(v);
+        return *this;
+    }
+};
 
 struct Color {
+    static const int maxValue = 254;
+    typedef unsigned char cType;
+    // Use the clamped wrapper for each channel
+    Clamped<cType, maxValue> r;
+    Clamped<cType, maxValue> g;
+    Clamped<cType, maxValue> b;
+    Clamped<cType, maxValue> a;
+
     // Helper to convert hex char to int
     static int hexToInt(char c) {
         if (c >= '0' && c <= '9') return c - '0';
@@ -52,7 +75,7 @@ struct Color {
         return 0;
     }
 
-    // Parse hex string to RGB
+    // Parse hex string to RGBA
     void parseHex(const std::string &hex) {
         if (hex.empty()) return;
 
@@ -61,37 +84,42 @@ struct Color {
             cleaned = cleaned.substr(1);
         }
 
-        // Convert to uppercase
+        // Convert to uppercase for consistency
         std::transform(cleaned.begin(), cleaned.end(), cleaned.begin(), ::toupper);
 
-        // Support both #RGB and #RRGGBB formats
+        // Support formats:
+        // - #RGB : 3-digit, assume opaque (alpha = maxValue)
+        // - #RGBA : 4-digit, includes alpha
+        // - #RRGGBB : 6-digit, assume opaque
+        // - #RRGGBBAA : 8-digit, includes alpha
         if (cleaned.length() == 3) {
-            // #RGB format - expand to #RRGGBB
-            r = hexToInt(cleaned[0]) * 16 + hexToInt(cleaned[0]);
-            g = hexToInt(cleaned[1]) * 16 + hexToInt(cleaned[1]);
-            b = hexToInt(cleaned[2]) * 16 + hexToInt(cleaned[2]);
+            r = static_cast<cType>(hexToInt(cleaned[0]) * 16 + hexToInt(cleaned[0]));
+            g = static_cast<cType>(hexToInt(cleaned[1]) * 16 + hexToInt(cleaned[1]));
+            b = static_cast<cType>(hexToInt(cleaned[2]) * 16 + hexToInt(cleaned[2]));
+            a = maxValue;
+        } else if (cleaned.length() == 4) {
+            r = static_cast<cType>(hexToInt(cleaned[0]) * 16 + hexToInt(cleaned[0]));
+            g = static_cast<cType>(hexToInt(cleaned[1]) * 16 + hexToInt(cleaned[1]));
+            b = static_cast<cType>(hexToInt(cleaned[2]) * 16 + hexToInt(cleaned[2]));
+            a = static_cast<cType>(hexToInt(cleaned[3]) * 16 + hexToInt(cleaned[3]));
         } else if (cleaned.length() == 6) {
-            // #RRGGBB format
-            r = hexToInt(cleaned[0]) * 16 + hexToInt(cleaned[1]);
-            g = hexToInt(cleaned[2]) * 16 + hexToInt(cleaned[3]);
-            b = hexToInt(cleaned[4]) * 16 + hexToInt(cleaned[5]);
+            r = static_cast<cType>(hexToInt(cleaned[0]) * 16 + hexToInt(cleaned[1]));
+            g = static_cast<cType>(hexToInt(cleaned[2]) * 16 + hexToInt(cleaned[3]));
+            b = static_cast<cType>(hexToInt(cleaned[4]) * 16 + hexToInt(cleaned[5]));
+            a = maxValue;
+        } else if (cleaned.length() == 8) {
+            r = static_cast<cType>(hexToInt(cleaned[0]) * 16 + hexToInt(cleaned[1]));
+            g = static_cast<cType>(hexToInt(cleaned[2]) * 16 + hexToInt(cleaned[3]));
+            b = static_cast<cType>(hexToInt(cleaned[4]) * 16 + hexToInt(cleaned[5]));
+            a = static_cast<cType>(hexToInt(cleaned[6]) * 16 + hexToInt(cleaned[7]));
         }
     }
 
-    unsigned char r = 0;
-    unsigned char g = 0;
-    unsigned char b = 0;
+    Color() = default;
 
-    // Default constructor creates a black color
-    Color() : r(0), g(0), b(0) {
-    }
+    Color(cType red, cType green, cType blue, cType alpha = maxValue)
+            : r(red), g(green), b(blue), a(alpha) {}
 
-    // Construct from RGB values
-    Color(unsigned char red, unsigned char green, unsigned char blue)
-            : r(red), g(green), b(blue) {
-    }
-
-    // Construct from hex string (e.g. "#ff0000")
     Color(const std::string &hexCode) {
         parseHex(hexCode);
     }
@@ -101,122 +129,253 @@ struct Color {
     }
 
     // Convert to hex string (always uppercase with #)
+    // If alpha is maxValue, the output will be in #RRGGBB format;
+    // otherwise, it will include alpha as #RRGGBBAA.
     std::string toHexString() const {
         std::stringstream ss;
         ss << '#' << std::uppercase << std::hex << std::setfill('0')
            << std::setw(2) << static_cast<int>(r)
            << std::setw(2) << static_cast<int>(g)
            << std::setw(2) << static_cast<int>(b);
+        if (a != maxValue) {
+            ss << std::setw(2) << static_cast<int>(a);
+        }
         return ss.str();
     }
 
-    // Implicit conversion to string
     operator std::string() const {
         return toHexString();
     }
 
-    // Comparison operators for map and general use
     bool operator==(const Color &other) const {
-        return r == other.r && g == other.g && b == other.b;
+        return r == other.r && g == other.g && b == other.b && a == other.a;
     }
 
     bool operator!=(const Color &other) const {
         return !(*this == other);
     }
 
-    // Less than operator for map keys
     bool operator<(const Color &other) const {
         if (r != other.r) return r < other.r;
         if (g != other.g) return g < other.g;
-        return b < other.b;
+        if (b != other.b) return b < other.b;
+        return a < other.a;
     }
 };
-
-//--------------------------------------------
-// Enumerations for friendly configuration options
-//--------------------------------------------
 
 enum class HorizontalAlignment {
     Left, Center, Right
 };
-
 enum class FontStyle {
     Default, Monospaced, Serif, SansSerif, Casual, Cursive, SmallCaps
 };
-
 enum class EdgeType {
     None, HardShadow, Bevel, GlowOutline, SoftShadow
 };
-
 enum class TextAlignment {
     Left, Right, Center
 };
 
-//--------------------------------------------
-// Conversion helpers for enum values to strings
-//--------------------------------------------
+//— helpers for enum↔string via magic_enum —//
+template<typename E>
+std::string enumToString(E e) {
+    auto name = magic_enum::enum_name(e);
+    return name.empty()
+           ? std::to_string(static_cast<std::underlying_type_t<E>>(e))
+           : std::string(name);
+}
 
-std::string toString(HorizontalAlignment align) {
-    switch (align) {
-        case HorizontalAlignment::Center:
-            return "2"; // center alignment value
-        case HorizontalAlignment::Right:
-            return "1"; // right alignment value
-        case HorizontalAlignment::Left:
-        default:
-            return "0"; // left alignment value
+template<typename E>
+E enumFromString(const std::string &s) {
+    if (auto v = magic_enum::enum_cast<E>(s))
+        return *v;
+    // try numeric
+    try {
+        auto i = std::stoi(s);
+        return static_cast<E>(i);
+    } catch (...) {
+        throw std::invalid_argument(
+                "Invalid " + std::string(magic_enum::enum_type_name<E>())
+                + " value: '" + s + "'");
     }
 }
 
-std::string toString(FontStyle style) {
-    // Map friendly names to numeric codes used in the XML "fs" attribute.
-    switch (style) {
-        case FontStyle::Monospaced:
-            return "1";
-        case FontStyle::Serif:
-            return "2";
-        case FontStyle::SansSerif:
-            return "3";
-        case FontStyle::Casual:
-            return "4";
-        case FontStyle::Cursive:
-            return "5";
-        case FontStyle::SmallCaps:
-            return "6";
-        case FontStyle::Default:
-        default:
-            return "0";
+// build a "Options: A, B, C" comment
+template<typename E>
+std::string enumOptionsComment() {
+    std::string c = ";Options: ";
+    bool first = true;
+    for (auto name: magic_enum::enum_names<E>()) {
+        if (!first) c += ", ";
+        c += name;
+        first = false;
     }
+    return c;
 }
 
-std::string toString(EdgeType edge) {
-    switch (edge) {
-        case EdgeType::HardShadow:
-            return "1";
-        case EdgeType::Bevel:
-            return "2";
-        case EdgeType::GlowOutline:
-            return "3";
-        case EdgeType::SoftShadow:
-            return "4";
-        case EdgeType::None:
-        default:
-            return "";
-    }
-}
 
-std::string toString(TextAlignment alignment) {
-    switch (alignment) {
-        case TextAlignment::Left:
-            return "1";
-        case TextAlignment::Right:
-            return "2";
-        case TextAlignment::Center:
-            return "3";
-        default:
-            return "";
+struct ChatParams {
+    bool textBold = false;
+    bool textItalic = false;
+    bool textUnderline = false;
+
+    Color textForegroundColor = {254, 254, 254, 254};
+    Color textBackgroundColor = {254, 254, 254, 0};
+    Color textEdgeColor = {254, 254, 254, 254};
+
+    EdgeType textEdgeType = EdgeType::SoftShadow;
+    FontStyle fontStyle = FontStyle::SansSerif;
+    int fontSizePercent = 0;
+
+    TextAlignment textAlignment = TextAlignment::Left;
+    int horizontalMargin = 71;
+    int verticalMargin = 0;
+    int verticalSpacing = 4;
+    int totalDisplayLines = 13;
+
+    int maxCharsPerLine = 25;
+    std::string usernameSeparator = ":";
+
+    void saveToFile(const char *filename) const {
+        CSimpleIniCaseA ini;
+        ini.SetUnicode();  // UTF‑8
+        ini.SetQuotes();
+        constexpr auto S = "General";
+
+        // bools
+        ini.SetBoolValue(S, "bold", textBold,
+                         ";true/false");
+        ini.SetBoolValue(S, "italic", textItalic,
+                         ";true/false");
+        ini.SetBoolValue(S, "underline", textUnderline,
+                         ";true/false");
+
+        // colors with format comment
+        {
+            auto hf = textForegroundColor.toHexString();
+            ini.SetValue(S, "textForegroundColor", hf.c_str(),
+                         ";Hex color: #RGB, #RGBA, #RRGGBB or #RRGGBBAA");
+        }
+        {
+            auto hb = textBackgroundColor.toHexString();
+            ini.SetValue(S, "textBackgroundColor", hb.c_str(),
+                         ";Hex color: #RGB, #RGBA, #RRGGBB or #RRGGBBAA");
+        }
+        {
+            auto he = textEdgeColor.toHexString();
+            ini.SetValue(S, "textEdgeColor", he.c_str(),
+                         ";Hex color: #RGB, #RGBA, #RRGGBB or #RRGGBBAA");
+        }
+
+        // enums with generated option lists
+        {
+            auto val = enumToString(textEdgeType);
+            auto cm = enumOptionsComment<EdgeType>();
+            ini.SetValue(S, "textEdgeType", val.c_str(), cm.c_str());
+        }
+        {
+            auto val = enumToString(fontStyle);
+            auto cm = enumOptionsComment<FontStyle>();
+            ini.SetValue(S, "fontStyle", val.c_str(), cm.c_str());
+        }
+        ini.SetLongValue(S, "fontSizePercent", fontSizePercent,
+                         ";0–300 (virtual percent)");
+
+        {
+            auto val = enumToString(textAlignment);
+            auto cm = enumOptionsComment<TextAlignment>();
+            ini.SetValue(S, "textAlignment", val.c_str(), cm.c_str());
+        }
+        ini.SetLongValue(S, "horizontalMargin", horizontalMargin,
+                         ";0–100 (virtual percent)");
+        ini.SetLongValue(S, "verticalMargin", verticalMargin,
+                         ";0-100 (virtual percent)");
+        ini.SetLongValue(S, "verticalSpacing", verticalSpacing,
+                         ";virtual pixels");
+        ini.SetLongValue(S, "totalDisplayLines", totalDisplayLines,
+                         ";lines");
+
+        ini.SetLongValue(S, "maxCharsPerLine", maxCharsPerLine,
+                         ";characters");
+        ini.SetValue(S, "usernameSeparator", usernameSeparator.c_str(),
+                     ";string between name and message");
+
+        ini.SaveFile(filename);
     }
-}
+
+    bool loadFromFile(const char *filename) {
+
+        CSimpleIniCaseA ini;
+        ini.SetUnicode();
+        ini.SetQuotes();
+        if (ini.LoadFile(filename) < 0) return false;
+        constexpr auto S = "General";
+
+        // bools (fallback to existing defaults)
+        textBold = ini.GetBoolValue(S, "bold", textBold);
+        textItalic = ini.GetBoolValue(S, "italic", textItalic);
+        textUnderline = ini.GetBoolValue(S, "underline", textUnderline);
+
+        // colors (fallback to defaults)
+        textForegroundColor = Color{
+                ini.GetValue(S, "textForegroundColor",
+                             textForegroundColor.toHexString().c_str())
+        };
+        textBackgroundColor = Color{
+                ini.GetValue(S, "textBackgroundColor",
+                             textBackgroundColor.toHexString().c_str())
+        };
+        textEdgeColor = Color{
+                ini.GetValue(S, "textEdgeColor",
+                             textEdgeColor.toHexString().c_str())
+        };
+
+        // enums (fallback via default string)
+        try {
+            textEdgeType = enumFromString<EdgeType>(
+                    ini.GetValue(S, "textEdgeType",
+                                 enumToString(textEdgeType).c_str()));
+        } catch (...) {
+        }
+        try {
+            fontStyle = enumFromString<FontStyle>(
+                    ini.GetValue(S, "fontStyle",
+                                 enumToString(fontStyle).c_str()));
+        } catch (...) {
+        }
+        try {
+            textAlignment = enumFromString<TextAlignment>(
+                    ini.GetValue(S, "textAlignment",
+                                 enumToString(textAlignment).c_str()));
+        } catch (...) {
+        }
+        fontSizePercent = static_cast<int>(
+                ini.GetLongValue(S, "fontSizePercent",
+                                 fontSizePercent));
+        horizontalMargin = static_cast<int>(
+                ini.GetLongValue(S, "horizontalMargin",
+                                 horizontalMargin));
+        verticalMargin = static_cast<int>(
+                ini.GetLongValue(S, "verticalMargin",
+                                 verticalMargin));
+        verticalSpacing = static_cast<int>(
+                ini.GetLongValue(S, "verticalSpacing",
+                                 verticalSpacing));
+        totalDisplayLines = static_cast<int>(
+                ini.GetLongValue(S, "totalDisplayLines",
+                                 totalDisplayLines));
+
+        maxCharsPerLine = static_cast<int>(
+                ini.GetLongValue(S, "maxCharsPerLine",
+                                 maxCharsPerLine));
+        usernameSeparator = ini.GetValue(S, "usernameSeparator",
+                                         usernameSeparator.c_str());
+
+
+        return true;
+    }
+};
+
 
 //--------------------------------------------
 // Data structures for chat messages and batches
@@ -247,37 +406,6 @@ struct Batch {
     std::deque<ChatLine> lines;
 };
 
-//--------------------------------------------
-// Chat parameters using enums for friendly names
-//--------------------------------------------
-struct ChatParams {
-    // Text style options (applied via <pen>)
-    bool textBold = false;                    // default: 0 (false)
-    u_char textForegroundOpacity = 254;          // default pen fo: "254"
-    u_char textBackgroundOpacity = 0;            // default pen bo: "0"
-
-    // Colors – defaults matching the Python tool.
-    Color textForegroundColor = {254, 254, 254};    // default foreground color
-    Color textBackgroundColor = {254, 254, 254};    // default background color
-
-    // Edge (outline/shadow) settings
-    Color textEdgeColor;                      // e.g. "#FF0000"; if not set, leave empty
-    EdgeType textEdgeType = EdgeType::SoftShadow; // default pen-et: "4" (SoftShadow)
-
-    // Font settings
-    FontStyle fontStyle = FontStyle::SansSerif; // default pen-fs: "3"
-    u_char fontSizePercentage = 0;              // default font scale from Python (default: 0)
-
-    // Positioning options
-    TextAlignment textAlignment = TextAlignment::Left;                   // workspace ju property (default "0")
-    int horizontalMargin = 71;                // margin (default: 71)
-    int verticalSpacing = 4;                  // space between lines (default: 4)
-    int totalDisplayLines = 13;               // maximum number of lines on screen
-
-    // Batch and wrapping options
-    int maxCharsPerLine = 25;                 // maximum characters per line before wrapping
-    std::string usernameSeparator = ":";      // separator between username and message
-};
 
 std::vector<std::string> wrapText(const std::string &text, int maxChars, int prefixSize) {
     std::vector<std::string> lines;
@@ -403,22 +531,24 @@ std::string generateXML(const std::vector<ChatMessage> &messages, const ChatPara
         XMLElement *pen = doc.NewElement("pen");
         pen->SetAttribute("id", std::to_string(penIndex).c_str());
         pen->SetAttribute("b", (params.textBold ? "1" : "0"));
+        pen->SetAttribute("i", (params.textItalic ? "1" : "0"));
+        pen->SetAttribute("u", (params.textUnderline ? "1" : "0"));
 
         // Use the friendly textForegroundColor if it differs from default white.
         pen->SetAttribute("fc", static_cast<std::string>(color).c_str());
-        pen->SetAttribute("fo", std::to_string(params.textForegroundOpacity).c_str());
+        pen->SetAttribute("fo", std::to_string(params.textForegroundColor.a).c_str());
         pen->SetAttribute("bc", static_cast<std::string>(params.textBackgroundColor).c_str());
-        pen->SetAttribute("bo", std::to_string(params.textBackgroundOpacity).c_str());
+        pen->SetAttribute("bo", std::to_string(params.textBackgroundColor.a).c_str());
 
         // Set edge attributes if provided.
-        std::string textEdgeType = toString(params.textEdgeType);
+        std::string textEdgeType = enumToString(params.textEdgeType);
         if (!textEdgeType.empty()) {
             pen->SetAttribute("ec", static_cast<std::string>(params.textEdgeColor).c_str());
             pen->SetAttribute("et", textEdgeType.c_str());
         }
 
-        pen->SetAttribute("fs", toString(params.fontStyle).c_str());
-        pen->SetAttribute("sz", std::to_string(params.fontSizePercentage).c_str());
+        pen->SetAttribute("fs", enumToString(params.fontStyle).c_str());
+        pen->SetAttribute("sz", std::to_string(params.fontSizePercent).c_str());
         head->InsertEndChild(pen);
         kv.second = std::to_string(penIndex);
         penIndex++;
@@ -427,8 +557,7 @@ std::string generateXML(const std::vector<ChatMessage> &messages, const ChatPara
     // Create workspace element for positioning.
     XMLElement *ws = doc.NewElement("ws");
     ws->SetAttribute("id", "1"); // default workspace id
-    // Use wsJu parameter instead of horizontalAlignment conversion.
-    ws->SetAttribute("ju", toString(params.textAlignment).c_str());
+    ws->SetAttribute("ju", enumToString(params.textAlignment).c_str());
     head->InsertEndChild(ws);
 
     // Create write positioning (wp) elements.
@@ -492,64 +621,5 @@ Color getRandomColor(const std::string &username) {
 
 }
 
-//--------------------------------------------
-// CSV parser function: parses CSV files with header fields
-// ("time", "user_name", "user_color", "message").
-// If the user_color field is empty, it uses "#ffffff" as default.
-//--------------------------------------------
-std::vector<ChatMessage> parseCSV(const std::string &filename) {
-    std::vector<ChatMessage> messages;
-    std::ifstream file(filename);
-    std::string line;
 
-    std::hash<std::string> hasher;
-    if (!file.is_open()) {
-        std::cerr << "Error: Could not open file " << filename << "\n";
-        return messages;
-    }
-
-    // Skip the header
-    std::getline(file, line);
-
-    while (std::getline(file, line)) {
-        std::stringstream ss(line);
-        std::string field;
-        ChatMessage msg;
-
-        // Parse time (and optionally multiply by a factor if needed)
-        std::getline(ss, field, ',');
-        msg.time = std::stoi(field) * 1000;
-
-        // Parse user name (assumed to be in the second field, e.g. "user_name")
-        std::getline(ss, msg.user.name, ',');
-
-        // Parse color: if empty, use "#ffffff"
-        std::getline(ss, field, ',');
-        msg.user.color = field.empty() ? getRandomColor(msg.user.name) : Color(field);
-
-        // Parse message (the rest of the line)
-        std::getline(ss, msg.message);
-        msg.message = msg.message.substr(1, msg.message.size() - 2);
-        messages.push_back(msg);
-    }
-
-    return messages;
-}
-
-//--------------------------------------------
-// Test function demonstrating hard-coded chat messages.
-//--------------------------------------------
-int test() {
-    // Example chat messages with different color creation methods
-    std::vector<ChatMessage> messages = parseCSV("../chat.csv");
-
-    // Set up friendly parameters using enums.
-    ChatParams params;
-
-    std::ofstream out("../out.srv3");
-    std::string xmlOutput = generateXML(messages, params);
-    out << xmlOutput << std::endl;
-
-    return 0;
-}
 

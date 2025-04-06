@@ -4,59 +4,95 @@ project(SubChat LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-
-# Find OpenGL
-find_package(OpenGL REQUIRED)
-
-# Find GLEW
-find_package(GLEW REQUIRED)
-
-# GLFW configuration
-if (NOT GLFW_DIR)
-    set(GLFW_DIR "${CMAKE_SOURCE_DIR}/submodules/glfw") # Use a path relative to the source directory
+if (NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build (Debug or Release)" FORCE)
 endif ()
 
 
-option(GLFW_BUILD_EXAMPLES "Build the GLFW example programs" OFF)
-option(GLFW_BUILD_TESTS "Build the GLFW test programs" OFF)
-option(GLFW_BUILD_DOCS "Build the GLFW documentation" OFF)
-option(GLFW_INSTALL "Generate installation target" OFF)
-option(GLFW_DOCUMENT_INTERNALS "Include internals in documentation" OFF)
+option(BUILD_GUI "Build the GUI config generator" ON)
 
-# Build GLFW in its own folder inside the binary directory
-add_subdirectory(${GLFW_DIR} ${CMAKE_BINARY_DIR}/glfw EXCLUDE_FROM_ALL)
-include_directories(${GLFW_DIR}/include)
-include_directories(${GLFW_DIR}/deps)
-
-# Dear ImGui configuration
-set(IMGUI_DIR "${CMAKE_SOURCE_DIR}/submodules/imgui")
-include_directories(${IMGUI_DIR} ${IMGUI_DIR}/backends)
-
+# External headers common to both targets
 set(TINYXML_DIR "${CMAKE_SOURCE_DIR}/submodules/tinyxml2")
-include_directories(${TINYXML_DIR})
-
-set(UTFCPP_DIR "${CMAKE_SOURCE_DIR}/submodules/utfcpp/source")
-include_directories(${UTFCPP_DIR})
-
-
-# Gather source files
-file(GLOB sources "${CMAKE_SOURCE_DIR}/*.cpp")
-
-# Create the executable
-add_executable(${PROJECT_NAME}
-        ${sources}
-        ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp
-        ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
-        ${IMGUI_DIR}/imgui.cpp
-        ${IMGUI_DIR}/imgui_draw.cpp
-        ${IMGUI_DIR}/imgui_demo.cpp
-        ${IMGUI_DIR}/imgui_tables.cpp
-        ${IMGUI_DIR}/imgui_widgets.cpp
-        ${IMGUI_DIR}/misc/cpp/imgui_stdlib.cpp
-        ${TINYXML_DIR}/tinyxml2.cpp
-
-
+set(SIMPLEINI_DIR "${CMAKE_SOURCE_DIR}/submodules/simpleini")
+set(MAGICENUM_DIR "${CMAKE_SOURCE_DIR}/submodules/magic_enum")
+set(UTFCPP_DIR "${CMAKE_SOURCE_DIR}/submodules/utfcpp/")
+include_directories(
+        ${TINYXML_DIR}
+        ${SIMPLEINI_DIR}
+        ${MAGICENUM_DIR}/include/magic_enum
+        ${UTFCPP_DIR}/source
 )
 
-# Link with GLFW, OpenGL and GLEW
-target_link_libraries(${PROJECT_NAME} glfw OpenGL::GL GLEW::GLEW)
+# ─────────────────────────────────────────────────────────────────
+# Static executable for subtitle generation (CLI)
+# ─────────────────────────────────────────────────────────────────
+set(CSV_CXX_STANDARD ${CMAKE_CXX_STANDARD})
+add_subdirectory("${CMAKE_SOURCE_DIR}/submodules/csv-parser")
+add_subdirectory("${CMAKE_SOURCE_DIR}/submodules/CLI11")
+
+add_executable(subtitles_generator
+        ytt_generator.cpp
+        ${TINYXML_DIR}/tinyxml2.cpp
+)
+target_include_directories(subtitles_generator
+        PUBLIC
+        ${TINYXML_DIR}
+        ${SIMPLEINI_DIR}
+        ${UTFCPP_DIR}/source
+        ${MAGICENUM_DIR}/include/magic_enum
+)
+target_link_options(subtitles_generator PRIVATE -static)
+target_link_libraries(subtitles_generator
+        PRIVATE
+        csv
+        CLI11::CLI11
+)
+
+# ─────────────────────────────────────────────────────────────────
+# GUI config generator
+# ─────────────────────────────────────────────────────────────────
+if (BUILD_GUI)
+    # Find GUI dependencies
+    find_package(OpenGL REQUIRED)
+    find_package(GLEW REQUIRED)
+
+    # GLFW configuration
+    set(GLFW_DIR "${CMAKE_SOURCE_DIR}/submodules/glfw")
+    option(GLFW_BUILD_EXAMPLES "Build the GLFW example programs" OFF)
+    option(GLFW_BUILD_TESTS "Build the GLFW test programs" OFF)
+    option(GLFW_BUILD_DOCS "Build the GLFW documentation" OFF)
+    option(GLFW_INSTALL "Generate installation target" OFF)
+    option(GLFW_DOCUMENT_INTERNALS "Include internals in documentation" OFF)
+    add_subdirectory(${GLFW_DIR} ${CMAKE_BINARY_DIR}/glfw EXCLUDE_FROM_ALL)
+    include_directories(${GLFW_DIR}/include ${GLFW_DIR}/deps)
+
+    # Dear ImGui configuration
+    set(IMGUI_DIR "${CMAKE_SOURCE_DIR}/submodules/imgui")
+    include_directories(${IMGUI_DIR} ${IMGUI_DIR}/backends)
+
+    # Add Native File Dialog
+    add_subdirectory("${CMAKE_SOURCE_DIR}/submodules/nativefiledialog-extended")
+
+    # Add GUI executable
+    add_executable(config_generator_gui
+            ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp
+            ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
+            ${IMGUI_DIR}/imgui.cpp
+            ${IMGUI_DIR}/imgui_draw.cpp
+            ${IMGUI_DIR}/imgui_demo.cpp
+            ${IMGUI_DIR}/imgui_tables.cpp
+            ${IMGUI_DIR}/imgui_widgets.cpp
+            ${IMGUI_DIR}/misc/cpp/imgui_stdlib.cpp
+            ${TINYXML_DIR}/tinyxml2.cpp
+            main.cpp
+            fonts/lucon.hpp
+    )
+
+    target_link_libraries(config_generator_gui
+            PRIVATE
+            glfw
+            OpenGL::GL
+            GLEW::GLEW
+            nfd
+    )
+endif ()

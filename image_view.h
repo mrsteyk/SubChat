@@ -6,48 +6,53 @@
 #include <string>
 #include <vector>
 #include "ytt_generator.h"
+#include "fonts/lucon.hpp"
 
 // Global font pointer.
 static ImFont *g_font = nullptr;
 
 
-// Structure holding the calculated metrics.
-struct SubtitleMetrics {
-    int maxCharsInLine;            // Maximum characters per line.
-    int maxLines;                  // Maximum number of lines that fit in the box.
-    int virtualFontSize;           // The user-selected virtual font size (in percentage).
-    int effectiveFirstLineCoordX;  // Computed effective first-line X coordinate (0 = left, 100 = right).
-    int effectiveFirstLineCoordY;  // Computed effective first-line Y coordinate (0 = top, 100 = bottom).
-    int relativeEffectiveDistanceBetweenLines; // Line spacing as a percent of the box height.
-};
-
 // Structure that holds the state of the interactive text overlay.
 struct InteractiveTextOverlay {
 
-    int virtualX = 0; // 0-100
-    int virtualY = 0; //0-100
-    // A factor applied to the base font size.
-    int virtualFontSize = 0;  // 0-300
-    float scaleConstantPerHeight = 22.5f;
+    ChatParams params;
+
 
     float realFontSize(int height) const {  // Made const for correctness
-        return (100.0f + (virtualFontSize - 100.0f) / 4.0f) / 100.0f * (height / scaleConstantPerHeight);
+        return (100.0f + (params.fontSizePercent - 100.0f) / 4.0f) / 100.0f * (height / 22.5f);
     }
 
     float realX() const {
-        return ((virtualX * 0.96) + 2.5f) / 100.0f;
+        return ((params.horizontalMargin * 0.96) + 2.5f) / 100.0f;
     }
 
     float realY(int N = 0) const {
-        return (((virtualY + N * virtualDistanceBetweenLines) * 0.96f) + 2.15f) / 100.0f;
+        return (((params.verticalMargin + N * params.verticalSpacing) * 0.96f) + 2.15f) / 100.0f;
     }
 
+    std::vector<std::pair<std::string, std::string>> preview;
+    bool revalidatePreview = true;
+    bool isInsidePicture = true;
 
-    int charsPerLine = 10;
-    int LinesCount = 2;
-    int virtualDistanceBetweenLines = 4;
-    // Added customizable text
-    std::string separator = ":";
+    void generatePreview() {
+        preview.clear();
+        for (auto [name, text]: messages) {
+            auto wrapped = wrapMessage(name, params.usernameSeparator, text, params.maxCharsPerLine);
+            if (wrapped.empty()) {
+                continue;
+            }
+            if (preview.size() < params.totalDisplayLines) {
+                preview.emplace_back(name, wrapped[0]);
+            } else {
+                break;
+            }
+            for (size_t i = 1; i < wrapped.size() && preview.size() < params.totalDisplayLines; ++i) {
+                preview.emplace_back("", wrapped[i]);
+            }
+        }
+        revalidatePreview = false;
+    }
+
     std::vector<std::pair<std::string, std::string>> messages = {
             {"Sirius",        "Lorem ipsum dolor sit amet, consectetur adipiscing elit."},
             {"Betelgeuse",    "Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."},
@@ -102,57 +107,35 @@ struct InteractiveTextOverlay {
             {"Alsephina",     "Donec sodales sagittis magna."},
             {"Sabik",         "Fusce fermentum odio nec arcu."}
     };
-    std::vector<std::pair<std::string, std::string>> preview;
-    bool revalidatePreview = true;
-
-    void generatePreview() {
-        preview.clear();
-        for (auto [name, text]: messages) {
-            auto wrapped = wrapMessage(name, separator, text, charsPerLine);
-            if (wrapped.empty()) {
-                continue;
-            }
-            if (preview.size() < LinesCount) {
-                preview.emplace_back(name, wrapped[0]);
-            } else {
-                break;
-            }
-            for (size_t i = 1; i < wrapped.size() && preview.size() < LinesCount; ++i) {
-                preview.emplace_back("", wrapped[i]);
-            }
-        }
-        revalidatePreview = false;
-    }
 };
 
-bool PreloadFont(const char *fontPath = "../fonts/lucon.ttf", float baseSize = 256.0f) {
+void PreloadPreviewFont() {
     ImGuiIO &io = ImGui::GetIO();
-
-    g_font = io.Fonts->AddFontFromFileTTF(fontPath, baseSize, nullptr, io.Fonts->GetGlyphRangesCyrillic());
-    return g_font != nullptr;  // Return success/failure
+    ImFontConfig font_cfg;
+    font_cfg.FontDataOwnedByAtlas = false;
+    g_font = io.Fonts->AddFontFromMemoryCompressedTTF(LuCon_compressed_data, LuCon_compressed_size, 256.0f, nullptr,
+                                                      io.Fonts->GetGlyphRangesCyrillic());
+    io.Fonts->Build();
 }
 
 // Renders an interactive image window that displays an image and overlays draggable,
 // resizable text using relative coordinates.
 inline void ShowInteractiveImage(
         ImTextureID texture, int texWidth, int texHeight,
-        bool *p_open,
         InteractiveTextOverlay *overlay) {
 
-    // Validate input parameters
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse; // no close button if you don't pass a bool*
+    ImGui::Begin("Preview", nullptr, flags);
+    if (texture == 0) {
+        ImGui::TextDisabled("No image loaded");
+        ImGui::End();
+        return;
+    }
     if (!texture || !overlay || texWidth <= 0 || texHeight <= 0) {
         return;
     }
 
-    // Define margins as a fraction of the image dimensions and handle size.
-    constexpr float marginX = 0.0f;
-    constexpr float marginY = 0.0f;
-    constexpr float handleSize = 20.0f; // Resize handle size.
 
-    if (!ImGui::Begin("Preview", p_open)) {
-        ImGui::End();
-        return;
-    }
     if (overlay->revalidatePreview) overlay->generatePreview();
 
     // Determine the available region and scale the image to fit while preserving aspect ratio.
@@ -178,8 +161,6 @@ inline void ShowInteractiveImage(
     // Compute the text position and desired font size.
     float desiredFontSize = overlay->realFontSize(texHeight) * scale;  // Fixed: use the renamed method
 
-    // Prepare text drawing.
-//    const char *text = overlay->text.c_str();  // Use the overlay's text field
     ImGui::PushFont(g_font);
 
     float textScale = desiredFontSize / g_font->FontSize;
@@ -194,7 +175,7 @@ inline void ShowInteractiveImage(
 
         if (i == 0) {
             startPos = textPos;
-            endPos.x = startPos.x + overlay->charsPerLine * boxWidth;
+            endPos.x = startPos.x + overlay->params.maxCharsPerLine * boxWidth;
         }
 
         const char *firstText = overlay->preview[i].first.c_str();
@@ -210,29 +191,35 @@ inline void ShowInteractiveImage(
         ImVec2 secondTextSize(secondBaseTextSize.x * textScale, secondBaseTextSize.y * textScale);
 
 
-        const Color c = getRandomColor(firstText);
+        const Color randomColor = getRandomColor(firstText);
+        const auto &textColor = overlay->params.textForegroundColor;
         drawList->AddText(g_font, desiredFontSize, textPos,
-                          IM_COL32(c.r, c.g, c.b, 254),
+                          IM_COL32(randomColor.r, randomColor.g, randomColor.b, textColor.a),
                           firstText);
 
 
         textPos.x += firstTextSize.x; // Move position for second text
         endPos.y = textPos.y + secondTextSize.y;
-
         drawList->AddText(g_font, desiredFontSize, textPos,
-                          IM_COL32(254, 254, 254, 254),
+                          IM_COL32(textColor.r, textColor.g, textColor.b, textColor.a),
                           secondText);
 
     }
     ImGui::PopFont();
 
+    const ImVec2 imgEndPos = imgPos + imageSize;
+    overlay->isInsidePicture = startPos.x >= imgPos.x &&
+                               startPos.y >= imgPos.y &&
+                               endPos.x <= imgEndPos.x &&
+                               endPos.y <= imgEndPos.y;
+
     ImGui::GetWindowDrawList()->AddRect(
             startPos,
             endPos,
-            IM_COL32(255, 255, 0, 255),
+            overlay->isInsidePicture ? IM_COL32(255, 255, 0, 200) : IM_COL32(255, 0, 0, 255),
             0.0f,  // rounding
             0,     // flags
-            2.0f   // thickness
+            overlay->isInsidePicture ? 2.0f : 4.0f   // thickness
     );
 
     ImGui::End();

@@ -19,8 +19,16 @@
 
 #include "stb_image.h"
 #include "ytt_generator.h"
+#include "fonts/lucon.hpp"
+#include <nfd.h>
 
-// float dpi_scale = 1;
+constexpr float FONT_LOAD_SIZE = 96;
+constexpr float FONT_SIZE = 20;
+constexpr float FONT_SCALE_CONSTANT = FONT_SIZE / FONT_LOAD_SIZE;
+
+bool first_time_layout = true;
+static ImGuiID dockspace_id = 0;
+
 // Simple helper function to load an image into a OpenGL texture with common settings
 bool LoadTextureFromMemory(const void *data, size_t data_size, GLuint *out_texture, int *out_width, int *out_height) {
     // Load from file
@@ -81,39 +89,82 @@ static float GetDPIScale(GLFWwindow *window) {
     return xscale; // Assuming uniform scaling for simplicity
 }
 
-void LoadFonts(float dpi_scale) {
+void LoadFonts() {
     ImGuiIO &io = ImGui::GetIO();
     io.Fonts->Clear();
-    io.Fonts->AddFontFromFileTTF("../fonts/lucon.ttf", 16.0f * dpi_scale, nullptr, io.Fonts->GetGlyphRangesCyrillic());
+    ImFontConfig font_cfg;
+    font_cfg.FontDataOwnedByAtlas = false;
+    auto font = io.Fonts->AddFontFromMemoryCompressedTTF(LuCon_compressed_data, LuCon_compressed_size, FONT_LOAD_SIZE,
+                                                         &font_cfg,
+                                                         io.Fonts->GetGlyphRangesCyrillic());
+    font->Scale = FONT_SCALE_CONSTANT;
     io.Fonts->Build();
 }
 
-void ApplyDPIStyles(float dpi_scale) {
+void ApplyDPI(float dpi_scale) {
+    static const ImGuiStyle default_style = ImGui::GetStyle();
+    ImGui::GetStyle() = default_style;
     ImGuiStyle &style = ImGui::GetStyle();
     style.ScaleAllSizes(dpi_scale);
+
 }
 
+
 void ShowDockSpace() {
-    // Create a full-screen window for our dockspace.
-    ImGuiViewport *viewport = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(viewport->Pos);
-    ImGui::SetNextWindowSize(viewport->Size);
-    ImGui::SetNextWindowViewport(viewport->ID);
-    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDocking |
-                                    ImGuiWindowFlags_NoTitleBar |
-                                    ImGuiWindowFlags_NoCollapse |
-                                    ImGuiWindowFlags_NoResize |
-                                    ImGuiWindowFlags_NoBringToFrontOnFocus |
-                                    ImGuiWindowFlags_NoNavFocus;
-    ImGui::Begin("MainDockSpace", nullptr, window_flags);
-    // The DockSpace() call must be inside this window.
-    ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
-    ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), 0);
+    ImGuiViewport *vp = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(vp->Pos);
+    ImGui::SetNextWindowSize(vp->Size);
+    ImGui::SetNextWindowViewport(vp->ID);
+
+    ImGuiWindowFlags wflags =
+            ImGuiWindowFlags_NoTitleBar
+            | ImGuiWindowFlags_NoCollapse
+            | ImGuiWindowFlags_NoResize
+            | ImGuiWindowFlags_NoMove
+            | ImGuiWindowFlags_NoBringToFrontOnFocus
+            | ImGuiWindowFlags_NoNavFocus
+            | ImGuiWindowFlags_NoBackground;
+    ImGui::Begin("##MainDockSpace", nullptr, wflags);
+
+    dockspace_id = ImGui::GetID("MyDockSpace");
+    ImGui::DockSpace(dockspace_id, ImVec2(0, 0), ImGuiDockNodeFlags_PassthruCentralNode);
+
+    if (first_time_layout) {
+        first_time_layout = false;
+        ImGui::DockBuilderRemoveNode(dockspace_id);
+        ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_None);
+        ImGui::DockBuilderSetNodeSize(dockspace_id, vp->Size);
+
+        ImGuiID left_id, right_id;
+        ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Left, 0.7f, &left_id, &right_id);
+
+        ImGui::DockBuilderDockWindow("Preview", left_id);
+        ImGui::DockBuilderDockWindow("Settings", right_id);
+
+        ImGui::DockBuilderFinish(dockspace_id);
+    }
+
     ImGui::End();
 }
 
+void ShowColorEdit(const char *label, Color &color) {
+    float col[4] = {color.r / 255.f,
+                    color.g / 255.f,
+                    color.b / 255.f,
+                    color.a / 255.f
+    };
+
+    // ImGui color edit widget
+    if (ImGui::ColorEdit4(label, col)) {
+        color.r = col[0] * 255;
+        color.g = col[1] * 255;
+        color.b = col[2] * 255;
+        color.a = col[3] * 255;
+    }
+}
+
+
 int main(int, char **) {
-    test();
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit())
         return 1;
@@ -129,74 +180,127 @@ int main(int, char **) {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
-    (void) io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    //io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     ImGui::StyleColorsDark();
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
 
     float dpi_scale = GetDPIScale(window);
-    LoadFonts(dpi_scale);
-    ApplyDPIStyles(dpi_scale);
+    LoadFonts();
+    ApplyDPI(dpi_scale);
 
-    bool show_image_window = true;
-    bool show_hello_window = true;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-    int my_image_width = 0;
-    int my_image_height = 0;
-    GLuint my_image_texture = 0;
-    bool ret = LoadTextureFromFile("../sample_t.png", &my_image_texture, &my_image_width, &my_image_height);
-    IM_ASSERT(ret);
+    int preview_width = 0;
+    int preview_height = 0;
+    GLuint preview_texture = 0;
 
-    // Variables to store our fixed dock node IDs.
-    bool first_time_layout = true;
-    static ImGuiID imageDockID = 0;
-    static ImGuiID helloDockID = 0;
-    PreloadFont();
+    PreloadPreviewFont();
     InteractiveTextOverlay text_overlay{};
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
         float new_dpi_scale = GetDPIScale(window);
-        if (new_dpi_scale != dpi_scale) {
-            printf("DPI scale: %f\n", new_dpi_scale);
+        if (fabs(dpi_scale - new_dpi_scale) > 0.1f * std::max(fabs(dpi_scale), fabs(new_dpi_scale))) {
             dpi_scale = new_dpi_scale;
-            LoadFonts(dpi_scale);
-            ApplyDPIStyles(dpi_scale);
+            ApplyDPI(dpi_scale);
         }
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
+        ShowDockSpace();
 
-        // Force the windows to always dock in their designated nodes.
-        if (show_image_window) {
-            //ImGui::SetNextWindowDockID(imageDockID, ImGuiCond_Always);
-            ShowInteractiveImage(my_image_texture, my_image_width, my_image_height, &show_image_window, &text_overlay);
-        }
+        ShowInteractiveImage(preview_texture, preview_width, preview_height, &text_overlay);
 
-        if (show_hello_window) {
-            //ImGui::SetNextWindowDockID(helloDockID, ImGuiCond_Always);
-            ImGui::Begin("Привет, Мир!");
-            ImGui::Text("This is some useful text.");
-            ImGui::SliderInt("virtualFontSize", &text_overlay.virtualFontSize, 0, 300);
-            ImGui::SliderInt("font X", &text_overlay.virtualX, 0, 100);
-            ImGui::SliderInt("font Y", &text_overlay.virtualY, 0, 100);
-            ImGui::SliderInt("LineSpaceY", &text_overlay.virtualDistanceBetweenLines,0,25);
+        auto &p = text_overlay.params;
 
-            bool revalidate = ImGui::SliderInt("LineCount", &text_overlay.LinesCount,1,50);
-            revalidate = revalidate || ImGui::SliderInt("charsPerLine", &text_overlay.charsPerLine,5,50);
-            if (revalidate){
-                text_overlay.generatePreview();
+        ImGui::Begin("Settings");
+        if (ImGui::Button("Load Image for Preview")) {
+            nfdu8char_t *outPath = nullptr;
+            nfdu8filteritem_t filters[1] = {{"Image Files", "png,jpg,jpeg"}};
+            nfdopendialogu8args_t args = {0};
+            args.filterList = filters;
+            args.filterCount = 1;
+            // Set the parent window handle using the GLFW binding
+            //NFD_GetNativeWindowFromGLFWWindow(window, &args.parentWindow);
+            nfdresult_t result = NFD_OpenDialogU8_With(&outPath, &args);
+            if (result == NFD_OKAY) {
+                // If a texture is already loaded, delete it first.
+                if (preview_texture != 0) {
+                    glDeleteTextures(1, &preview_texture);
+                    preview_texture = 0;
+                }
+                bool ret = LoadTextureFromFile(outPath, &preview_texture, &preview_width, &preview_height);
+                if (!ret)
+                    printf("Failed to load image: %s\n", outPath);
+                NFD_FreePathU8(outPath);
+            } else if (result == NFD_CANCEL) {
+                printf("User pressed cancel.\n");
+            } else {
+                printf("Error: %s\n", NFD_GetError());
             }
-            // (Add any additional hello world UI elements here)
-            if (ImGui::Button("Open")) {
-                show_image_window = true;
-                text_overlay.generatePreview();
-            }
-            ImGui::End();
         }
+        if (preview_texture == 0) ImGui::BeginDisabled();
+        ImGui::SliderInt("X", &p.horizontalMargin, 0, 100);
+        ImGui::SliderInt("Y", &p.verticalMargin, 0, 100);
+        ImGui::SliderInt("Font size", &p.fontSizePercent, 0, 300);
+        ImGui::SliderInt("Vertical\nspacing", &p.verticalSpacing, 0, 25);
+//        TODO add more options to GUI
+//        ImGui::Checkbox("Bold", &p.textBold);
+//        ImGui::SameLine();
+//        ImGui::Checkbox("Italic", &p.textItalic);
+//        ImGui::SameLine();
+//        ImGui::Checkbox("Underline", &p.textUnderline);
+        ShowColorEdit("Text Color", p.textForegroundColor);
+        text_overlay.revalidatePreview += ImGui::SliderInt("Characters\nper line", &p.maxCharsPerLine, 5, 50);
+        text_overlay.revalidatePreview += ImGui::SliderInt("Line\nCount", &p.totalDisplayLines, 1, 50);
+        text_overlay.revalidatePreview += ImGui::InputText("Username\nSeparator", &p.usernameSeparator);
+        if (ImGui::Button("Load Config")) {
+            nfdu8char_t *outPath = nullptr;
+            nfdu8filteritem_t filters[1] = {{"Chat configs", "ini"}};
+            nfdopendialogu8args_t args = {0};
+            args.filterList = filters;
+            args.filterCount = 1;
+            // TODO Set the parent window handle using the GLFW binding
+            //NFD_GetNativeWindowFromGLFWWindow(window, &args.parentWindow);
+            nfdresult_t result = NFD_OpenDialogU8_With(&outPath, &args);
+            if (result == NFD_OKAY) {
+                p.loadFromFile(outPath);
+                text_overlay.revalidatePreview = true;
+                NFD_FreePathU8(outPath);
+            } else if (result == NFD_CANCEL) {
+                printf("User pressed cancel on load config.\n");
+            } else {
+                printf("Error (load config): %s\n", NFD_GetError());
+            }
+        }
+        ImGui::SameLine();
+        if (!text_overlay.isInsidePicture)
+            ImGui::BeginDisabled();// --- New Code: "Save Params" using NFDe ---
+        if (ImGui::Button("Save Config")) {
+            nfdu8char_t *outPath = nullptr;
+            nfdu8filteritem_t filters[1] = {{"Chat configs", "ini"}};
+            nfdsavedialogu8args_t args = {0};
+            args.filterList = filters;
+            args.filterCount = 1;
+            // Optionally, you can set a default filename:
+            args.defaultName = "config.ini";
+            // TODO NFD_GetNativeWindowFromGLFWWindow(window, &args.parentWindow);
+            nfdresult_t result = NFD_SaveDialogU8_With(&outPath, &args);
+            if (result == NFD_OKAY) {
+                p.saveToFile(outPath);
+                NFD_FreePathU8(outPath);
+            } else if (result == NFD_CANCEL) {
+                printf("User pressed cancel on save configs.\n");
+            } else {
+                printf("Error (save configs): %s\n", NFD_GetError());
+            }
+        }
+        if (!text_overlay.isInsidePicture) ImGui::EndDisabled();
+        if (preview_texture == 0) ImGui::EndDisabled();
+
+        ImGui::End();
 
         ImGui::Render();
         int display_w, display_h;
