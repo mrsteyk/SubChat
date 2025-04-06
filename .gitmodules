@@ -1,0 +1,23 @@
+[submodule "submodules/imgui"]
+	path = submodules/imgui
+	url = https://github.com//ocornut/imgui
+	branch = docking
+[submodule "submodules/tinyxml2"]
+	path = submodules/tinyxml2
+	url = https://github.com/leethomason/tinyxml2
+[submodule "submodules/utfcpp"]
+	path = submodules/utfcpp
+	url = https://github.com/nemtrif/utfcpp
+[submodule "submodules/glfw"]
+	path = submodules/glfw
+	url = https://github.com/glfw/glfw.git
+[submodule "submodules/CLI11"]
+	url = https://github.com/CLIUtils/CLI11
+[submodule "submodules/csv-parser"]
+	url = https://github.com/vincentlaucsb/csv-parser
+[submodule "submodules/nativefiledialog-extended"]
+	url = https://github.com/btzy/nativefiledialog-extended
+[submodule "submodules/magic_enum"]
+	url = https://github.com/Neargye/magic_enum/
+[submodule "submodules/simpleini"]
+	url = https://github.com/brofield/simpleini
