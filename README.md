@@ -56,7 +56,7 @@ For example, you can download chat from Twitch VOD using https://www.twitchchatd
 Clone the repository recursively to fetch all submodules:
 
 ```bash
-git clone --recursive <repository_url>
+git clone --recursive https://github.com/Kam1k4dze/SubChat
 ```
 
 If already cloned without submodules:
@@ -136,6 +136,4 @@ Convert a chat CSV into a subtitle file using a config file.
   Output subtitle file (e.g., `output.ytt` or `output.srv3`).
 
 - `-u, --time-unit`  
-  Time unit in the CSV: `"ms"` or `"sec"`. The tool applies a multiplier:
-    - `ms`: No conversion
-    - `sec`: Converts to milliseconds
+  Time unit in the CSV: `"ms"` or `"sec"`.

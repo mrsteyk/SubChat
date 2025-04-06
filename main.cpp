@@ -226,7 +226,6 @@ int main(int, char **) {
             //NFD_GetNativeWindowFromGLFWWindow(window, &args.parentWindow);
             nfdresult_t result = NFD_OpenDialogU8_With(&outPath, &args);
             if (result == NFD_OKAY) {
-                // If a texture is already loaded, delete it first.
                 if (preview_texture != 0) {
                     glDeleteTextures(1, &preview_texture);
                     preview_texture = 0;
@@ -236,7 +235,7 @@ int main(int, char **) {
                     printf("Failed to load image: %s\n", outPath);
                 NFD_FreePathU8(outPath);
             } else if (result == NFD_CANCEL) {
-                printf("User pressed cancel.\n");
+
             } else {
                 printf("Error: %s\n", NFD_GetError());
             }
@@ -277,14 +276,13 @@ int main(int, char **) {
         }
         ImGui::SameLine();
         if (!text_overlay.isInsidePicture)
-            ImGui::BeginDisabled();// --- New Code: "Save Params" using NFDe ---
+            ImGui::BeginDisabled();
         if (ImGui::Button("Save Config")) {
             nfdu8char_t *outPath = nullptr;
             nfdu8filteritem_t filters[1] = {{"Chat configs", "ini"}};
             nfdsavedialogu8args_t args = {0};
             args.filterList = filters;
             args.filterCount = 1;
-            // Optionally, you can set a default filename:
             args.defaultName = "config.ini";
             // TODO NFD_GetNativeWindowFromGLFWWindow(window, &args.parentWindow);
             nfdresult_t result = NFD_SaveDialogU8_With(&outPath, &args);

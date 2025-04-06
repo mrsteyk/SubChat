@@ -61,13 +61,13 @@ struct Clamped {
 struct Color {
     static const int maxValue = 254;
     typedef unsigned char cType;
-    // Use the clamped wrapper for each channel
+
     Clamped<cType, maxValue> r;
     Clamped<cType, maxValue> g;
     Clamped<cType, maxValue> b;
     Clamped<cType, maxValue> a;
 
-    // Helper to convert hex char to int
+
     static int hexToInt(char c) {
         if (c >= '0' && c <= '9') return c - '0';
         if (c >= 'A' && c <= 'F') return c - 'A' + 10;
@@ -75,7 +75,7 @@ struct Color {
         return 0;
     }
 
-    // Parse hex string to RGBA
+
     void parseHex(const std::string &hex) {
         if (hex.empty()) return;
 
@@ -176,7 +176,7 @@ enum class TextAlignment {
     Left, Right, Center
 };
 
-//— helpers for enum↔string via magic_enum —//
+
 template<typename E>
 std::string enumToString(E e) {
     auto name = magic_enum::enum_name(e);
@@ -189,7 +189,6 @@ template<typename E>
 E enumFromString(const std::string &s) {
     if (auto v = magic_enum::enum_cast<E>(s))
         return *v;
-    // try numeric
     try {
         auto i = std::stoi(s);
         return static_cast<E>(i);
@@ -200,7 +199,7 @@ E enumFromString(const std::string &s) {
     }
 }
 
-// build a "Options: A, B, C" comment
+
 template<typename E>
 std::string enumOptionsComment() {
     std::string c = ";Options: ";
@@ -238,7 +237,7 @@ struct ChatParams {
 
     void saveToFile(const char *filename) const {
         CSimpleIniCaseA ini;
-        ini.SetUnicode();  // UTF‑8
+        ini.SetUnicode();
         ini.SetQuotes();
         constexpr auto S = "General";
 
@@ -316,7 +315,7 @@ struct ChatParams {
         textItalic = ini.GetBoolValue(S, "italic", textItalic);
         textUnderline = ini.GetBoolValue(S, "underline", textUnderline);
 
-        // colors (fallback to defaults)
+        // colors
         textForegroundColor = Color{
                 ini.GetValue(S, "textForegroundColor",
                              textForegroundColor.toHexString().c_str())
@@ -376,11 +375,6 @@ struct ChatParams {
     }
 };
 
-
-//--------------------------------------------
-// Data structures for chat messages and batches
-//--------------------------------------------
-
 struct User {
     std::string name;
     Color color;
@@ -423,16 +417,14 @@ std::vector<std::string> wrapText(const std::string &text, int maxChars, int pre
         int lineLen = utf8_length(line);
         int wordLen = utf8_length(word);
 
-        // If adding the word (with a space) would exceed current line limit
         if (!line.empty() && (lineLen + 1 + wordLen > currentMaxChars)) {
             lines.push_back(line);
             line.clear();
             isFirstLine = false;
         }
 
-        // If the word itself is too long, break it up.
+
         if (wordLen > currentMaxChars) {
-            // If there is a partial line already, push it out.
             if (!line.empty()) {
                 lines.push_back(line);
                 line.clear();
@@ -442,13 +434,12 @@ std::vector<std::string> wrapText(const std::string &text, int maxChars, int pre
             while (wordIt != word.end()) {
                 auto startIt = wordIt;
                 int count = 0;
-                // Advance wordIt by at most currentMaxChars code points.
                 while (wordIt != word.end() && count < currentMaxChars) {
                     utf8::next(wordIt, word.end());
                     ++count;
                 }
                 lines.emplace_back(startIt, wordIt);
-                currentMaxChars = maxChars;  // after the first broken piece, use full line limit
+                currentMaxChars = maxChars;
                 isFirstLine = false;
             }
             continue;
@@ -478,11 +469,7 @@ std::vector<std::string> wrapMessage(std::string &username,
     return wrapText(usernameSeparator + message, maxCharsPerLine, utf8_length(username));;
 }
 
-//--------------------------------------------
-// Function: generateXML
-// Builds batches from ChatMessages, maps friendly ChatParams (with enums) into the XML attributes,
-// and returns the XML string using tinyxml2.
-//--------------------------------------------
+
 std::string generateXML(const std::vector<ChatMessage> &messages, const ChatParams &params) {
     using namespace tinyxml2;
     XMLDocument doc;
@@ -512,13 +499,10 @@ std::string generateXML(const std::vector<ChatMessage> &messages, const ChatPara
         batches.emplace_back(msg.time, currentLines);
     }
 
-    // Create the root <timedtext> element.
     XMLElement *root = doc.NewElement("timedtext");
-    // Format attribute always set to "3" as in the Python code.
     root->SetAttribute("format", "3");
     doc.InsertFirstChild(root);
 
-    // Create head and body elements.
     XMLElement *head = doc.NewElement("head");
     root->InsertEndChild(head);
     XMLElement *body = doc.NewElement("body");
@@ -572,7 +556,7 @@ std::string generateXML(const std::vector<ChatMessage> &messages, const ChatPara
     // Zero-width space (ZWSP) as a UTF-8 string.
     const char *ZWSP = "\xE2\x80\x8B";
 
-    // Build the body: add <p> elements from each batch (except the last one).
+    // Build the body: add <p> elements from each batch;
     for (size_t batchIndex = 0; batchIndex + 1 < batches.size(); ++batchIndex) {
         const Batch &batch = batches[batchIndex];
         const Batch &nextBatch = batches[batchIndex + 1];
