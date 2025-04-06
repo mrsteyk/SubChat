@@ -8,17 +8,16 @@
 #include "ytt_generator.h"
 #include "fonts/lucon.hpp"
 
-// Global font pointer.
+
 static ImFont *g_font = nullptr;
 
 
-// Structure that holds the state of the interactive text overlay.
 struct InteractiveTextOverlay {
 
     ChatParams params;
 
 
-    float realFontSize(int height) const {  // Made const for correctness
+    float realFontSize(int height) const {
         return (100.0f + (params.fontSizePercent - 100.0f) / 4.0f) / 100.0f * (height / 22.5f);
     }
 
@@ -118,13 +117,12 @@ void PreloadPreviewFont() {
     io.Fonts->Build();
 }
 
-// Renders an interactive image window that displays an image and overlays draggable,
-// resizable text using relative coordinates.
+
 inline void ShowInteractiveImage(
         ImTextureID texture, int texWidth, int texHeight,
         InteractiveTextOverlay *overlay) {
 
-    ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse; // no close button if you don't pass a bool*
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoCollapse;
     ImGui::Begin("Preview", nullptr, flags);
     if (texture == 0) {
         ImGui::TextDisabled("No image loaded");
@@ -138,34 +136,27 @@ inline void ShowInteractiveImage(
 
     if (overlay->revalidatePreview) overlay->generatePreview();
 
-    // Determine the available region and scale the image to fit while preserving aspect ratio.
     ImVec2 availSize = ImGui::GetContentRegionAvail();
     float scale = ImMin(availSize.x / static_cast<float>(texWidth), availSize.y / static_cast<float>(texHeight));
     ImVec2 imageSize(texWidth * scale, texHeight * scale);
 
-    // Center the image in the available area.
     ImVec2 offset((availSize.x - imageSize.x) * 0.5f, (availSize.y - imageSize.y) * 0.5f);
     ImGui::SetCursorPos(ImGui::GetCursorPos() + offset);
 
-    // Draw the image.
     ImGui::Image(texture, imageSize);
     // Get the screen-space top-left of the image.
     ImVec2 imgPos = ImGui::GetItemRectMin();
 
-    // Check if font is loaded
     if (!g_font) {
         ImGui::End();
         return;
     }
 
-    // Compute the text position and desired font size.
-    float desiredFontSize = overlay->realFontSize(texHeight) * scale;  // Fixed: use the renamed method
-
+    float desiredFontSize = overlay->realFontSize(texHeight) * scale;
     ImGui::PushFont(g_font);
 
     float textScale = desiredFontSize / g_font->FontSize;
     ImDrawList *drawList = ImGui::GetWindowDrawList();
-    // Render the text.
     ImVec2 letterSize = ImGui::CalcTextSize("M");
     float boxWidth = letterSize.x * textScale;
     ImVec2 startPos;
@@ -198,7 +189,7 @@ inline void ShowInteractiveImage(
                           firstText);
 
 
-        textPos.x += firstTextSize.x; // Move position for second text
+        textPos.x += firstTextSize.x;
         endPos.y = textPos.y + secondTextSize.y;
         drawList->AddText(g_font, desiredFontSize, textPos,
                           IM_COL32(textColor.r, textColor.g, textColor.b, textColor.a),
@@ -217,9 +208,9 @@ inline void ShowInteractiveImage(
             startPos,
             endPos,
             overlay->isInsidePicture ? IM_COL32(255, 255, 0, 200) : IM_COL32(255, 0, 0, 255),
-            0.0f,  // rounding
-            0,     // flags
-            overlay->isInsidePicture ? 2.0f : 4.0f   // thickness
+            0.0f,
+            0,
+            overlay->isInsidePicture ? 2.0f : 4.0f
     );
 
     ImGui::End();
