@@ -56,7 +56,7 @@ For example, you can download chat from Twitch VOD using https://www.twitchchatd
 Clone the repository recursively to fetch all submodules:
 
 ```bash
-git clone --recursive https://github.com/Kam1k4dze/SubChat
+git clone --recursive --shallow-submodules https://github.com/Kam1k4dze/SubChat
 ```
 
 If already cloned without submodules:
