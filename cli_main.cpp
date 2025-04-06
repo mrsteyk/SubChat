@@ -6,12 +6,12 @@
 #include <vector>
 #include <string>
 
-// Updated parseCSV to take a multiplier
+
 std::vector<ChatMessage> parseCSV(const std::string &filename, int timeMultiplier) {
     std::vector<ChatMessage> messages;
     try {
         csv::CSVReader reader(filename);
-        for (auto &row : reader) {
+        for (auto &row: reader) {
             ChatMessage msg;
             msg.time = row["time"].get<int>() * timeMultiplier;
 
@@ -49,33 +49,28 @@ int main(int argc, char *argv[]) {
             ->check(CLI::ExistingFile);
     app.add_option("-o,--output", outputPath, "Output file (e.g. output.srv3 or output.ytt)")
             ->required();
-    app.add_option("-u,--time-unit", timeUnit,"Time unit inside CSV: “ms” or “sec”")
-    ->required()
-            ->check(CLI::IsMember({"ms","sec"}, CLI::ignore_case));
+    app.add_option("-u,--time-unit", timeUnit, "Time unit inside CSV: “ms” or “sec”")
+            ->required()
+            ->check(CLI::IsMember({"ms", "sec"}, CLI::ignore_case));
 
     CLI11_PARSE(app, argc, argv);
 
-    // Determine multiplier from timeUnit
     int multiplier = (timeUnit == "sec") ? 1000 : 1;
 
-    // Load config
     ChatParams params;
     if (!params.loadFromFile(configPath.c_str())) {
         std::cerr << "Error: Cannot open config file: " << configPath << "\n";
         return 1;
     }
 
-    // Parse CSV with correct time multiplier
     auto chat = parseCSV(csvPath, multiplier);
     if (chat.empty()) {
         std::cerr << "Error: Failed to parse chat CSV or it's empty: " << csvPath << "\n";
         return 1;
     }
 
-    // Generate XML
     std::string xml = generateXML(chat, params);
 
-    // Write to output
     std::ofstream out(outputPath);
     if (!out) {
         std::cerr << "Error: Cannot open output file: " << outputPath << "\n";
