@@ -27,7 +27,6 @@ include_directories(
 # Static executable for subtitle generation (CLI)
 # ─────────────────────────────────────────────────────────────────
 set(CSV_CXX_STANDARD ${CMAKE_CXX_STANDARD})
-add_subdirectory("${CMAKE_SOURCE_DIR}/submodules/csv-parser")
 add_subdirectory("${CMAKE_SOURCE_DIR}/submodules/CLI11")
 
 add_executable(subtitles_generator
@@ -44,7 +43,6 @@ target_include_directories(subtitles_generator
 target_link_options(subtitles_generator PRIVATE -static)
 target_link_libraries(subtitles_generator
         PRIVATE
-        csv
         CLI11::CLI11
 )
 

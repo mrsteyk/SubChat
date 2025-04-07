@@ -19,7 +19,7 @@ The project has two separate targets:
   *Uses Submodules*: GLFW, Dear ImGui, TinyXML2, SimpleIni, Magic Enum, UTFCPP, nativefiledialog-extended.
 
  - **subtitles_generator**: A CLI tool that converts CSV chat logs into subtitle files (YTT/SRV3) using a given config file.  
-  *Uses Submodules*: CSV Parser, CLI11, TinyXML2, SimpleIni, Magic Enum, UTFCPP.
+  *Uses Submodules*: CLI11, TinyXML2, SimpleIni, Magic Enum, UTFCPP.
 
 ---
 

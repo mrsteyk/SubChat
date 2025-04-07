@@ -2,38 +2,53 @@
 #include <CLI/CLI.hpp>
 #include <iostream>
 #include <fstream>
-#include "csv.hpp"
 #include <vector>
 #include <string>
 
-
+// dumb and simple way to parse CSV
 std::vector<ChatMessage> parseCSV(const std::string &filename, int timeMultiplier) {
     std::vector<ChatMessage> messages;
-    try {
-        csv::CSVReader reader(filename);
-        for (auto &row: reader) {
-            ChatMessage msg;
-            msg.time = row["time"].get<int>() * timeMultiplier;
+    std::ifstream file(filename);
+    std::string line;
 
-            msg.user.name = row["user_name"].get<>();
-
-            std::string col = row["user_color"].get<>();
-            if (col.empty()) {
-                msg.user.color = getRandomColor(msg.user.name);
-            } else {
-                msg.user.color = Color(col);
-            }
-
-            msg.message = row["message"].get<>();
-            messages.push_back(std::move(msg));
-        }
-    } catch (const std::exception &ex) {
-        std::cerr << "Error parsing CSV \"" << filename << "\": "
-                  << ex.what() << "\n";
+    if (!file.is_open()) {
+        std::cerr << "Error: Could not open file " << filename << "\n";
         std::exit(-1);
     }
+
+    std::getline(file, line);
+    if (line != "time,user_name,user_color,message") {
+        std::cerr << "Error: Unexpected CSV header format.\n";
+        std::exit(-1);
+    }
+
+    while (std::getline(file, line)) {
+        std::stringstream ss(line);
+        std::string field;
+        ChatMessage msg;
+
+        std::getline(ss, field, ',');
+        msg.time = std::stoi(field) * timeMultiplier;
+
+        std::getline(ss, msg.user.name, ',');
+
+        std::getline(ss, field, ',');
+        msg.user.color = field.empty() ? getRandomColor(msg.user.name) : Color(field);
+
+        std::getline(ss, msg.message);
+
+        if (msg.message.size() >= 2 &&
+            msg.message.front() == '"' &&
+            msg.message.back() == '"') {
+            msg.message = msg.message.substr(1, msg.message.size() - 2);
+        }
+
+        messages.emplace_back(std::move(msg));
+    }
+
     return messages;
 }
+
 
 int main(int argc, char *argv[]) {
     CLI::App app{"Chat → YTT/SRV3 subtitle generator"};
