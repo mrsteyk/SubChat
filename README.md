@@ -16,10 +16,10 @@ The project has two separate targets:
 - **config_generator_gui**: A GUI tool for creating and editing INI config files used by the subtitle generator.  
   *System Dependencies*: OpenGL, GLEW
 
-  *Submodule Dependencies*: GLFW, Dear ImGui, TinyXML2, SimpleIni, Magic Enum, UTFCPP, nativefiledialog-extended.
+  *Uses Submodules*: GLFW, Dear ImGui, TinyXML2, SimpleIni, Magic Enum, UTFCPP, nativefiledialog-extended.
 
-- **subtitles_generator**: A CLI tool that converts CSV chat logs into subtitle files (YTT/SRV3) using a given config file.  
-  *Submodule Dependencies*: CSV Parser, CLI11, TinyXML2, SimpleIni, Magic Enum, UTFCPP.
+ - **subtitles_generator**: A CLI tool that converts CSV chat logs into subtitle files (YTT/SRV3) using a given config file.  
+  *Uses Submodules*: CSV Parser, CLI11, TinyXML2, SimpleIni, Magic Enum, UTFCPP.
 
 ---
 
