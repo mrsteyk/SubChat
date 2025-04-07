@@ -180,7 +180,14 @@ enum class HorizontalAlignment {
     Left, Center, Right
 };
 enum class FontStyle {
-    Default, Monospaced, Serif, SansSerif, Casual, Cursive, SmallCaps
+    Default,
+    Monospaced,   // Courier New
+    Proportional,        // Times New Roman
+    MonospacedSans,    // Lucida Console
+    ProportionalSans,       // Roboto
+    Casual,      // Comic Sans!
+    Cursive,    // Monotype Corsiva
+    SmallCapitals // (Arial with font-variant: small-caps)
 };
 enum class EdgeType {
     None, HardShadow, Bevel, GlowOutline, SoftShadow
@@ -212,6 +219,11 @@ E enumFromString(const std::string &s) {
     }
 }
 
+template<typename E>
+std::string enumToIntString(E e) {
+    return std::to_string(magic_enum::enum_integer(e));
+
+}
 
 template<typename E>
 std::string enumOptionsComment() {
@@ -236,7 +248,7 @@ struct ChatParams {
     Color textEdgeColor = {254, 254, 254, 254};
 
     EdgeType textEdgeType = EdgeType::SoftShadow;
-    FontStyle fontStyle = FontStyle::SansSerif;
+    FontStyle fontStyle = FontStyle::MonospacedSans;
     int fontSizePercent = 0;
 
     TextAlignment textAlignment = TextAlignment::Left;
@@ -466,7 +478,10 @@ std::pair<std::string, std::vector<std::string>> wrapMessage(std::string usernam
             continue;
         }
         if (utf8_length(word) < availableSpace) {
-            if (!firstWord) lines.back() += " ";
+            if (!firstWord) {
+                lines.back() += " ";
+                availableSpace--;
+            }
             lines.back() += word;
             availableSpace -= utf8_length(word);
         } else {
@@ -476,6 +491,9 @@ std::pair<std::string, std::vector<std::string>> wrapMessage(std::string usernam
         }
         firstWord = false;
     }
+//    for (const auto& line :lines){
+//        assert(utf8_length(line)<=maxWidth);
+//    }
     return {username, lines};
 }
 
@@ -536,13 +554,13 @@ std::string generateXML(const std::vector<ChatMessage> &messages, const ChatPara
         pen->SetAttribute("bo", std::to_string(params.textBackgroundColor.a).c_str());
 
         // Set edge attributes if provided.
-        std::string textEdgeType = enumToString(params.textEdgeType);
+        std::string textEdgeType = enumToIntString(params.textEdgeType);
         if (!textEdgeType.empty()) {
             pen->SetAttribute("ec", static_cast<std::string>(params.textEdgeColor).c_str());
             pen->SetAttribute("et", textEdgeType.c_str());
         }
 
-        pen->SetAttribute("fs", enumToString(params.fontStyle).c_str());
+        pen->SetAttribute("fs", enumToIntString(params.fontStyle).c_str());
         pen->SetAttribute("sz", std::to_string(params.fontSizePercent).c_str());
         head->InsertEndChild(pen);
         kv.second = std::to_string(penIndex);
@@ -552,7 +570,7 @@ std::string generateXML(const std::vector<ChatMessage> &messages, const ChatPara
     // Create workspace element for positioning.
     XMLElement *ws = doc.NewElement("ws");
     ws->SetAttribute("id", "1"); // default workspace id
-    ws->SetAttribute("ju", enumToString(params.textAlignment).c_str());
+    ws->SetAttribute("ju", enumToIntString(params.textAlignment).c_str());
     head->InsertEndChild(ws);
 
     // Create write positioning (wp) elements.
@@ -616,27 +634,6 @@ Color getRandomColor(const std::string &username) {
 
 }
 
-int test() {
-    // Example inputs.
-    std::string username = "Alice1234";
-    std::string separator = ": ";
-    std::string message = "Hello this is a long message that we will try to wrap correctly even if there are verylongwordswithoutanyspaces";
-    int maxWidth = 30;
-
-    auto [displayName, wrappedLines] = wrapMessage(username, separator, message, maxWidth);
-
-    // Print the results.
-    std::cout << "Username: " << displayName << "\n";
-    std::cout << "Message:\n";
-    // Print the full first line as it would appear when concatenated.
-    std::string fullFirstLine = displayName + wrappedLines[0];
-    std::cout << fullFirstLine << "|" << utf8_length(fullFirstLine) << "\n";
-    for (size_t i = 1; i < wrappedLines.size(); ++i) {
-        std::cout << wrappedLines[i] << "|" << utf8_length(wrappedLines[i]) << "\n";
-    }
-
-    return 0;
-}
 
 
 
