@@ -35,13 +35,13 @@ struct InteractiveTextOverlay {
 
     void generatePreview() {
         preview.clear();
-        for (auto [name, text]: messages) {
-            auto wrapped = wrapMessage(name, params.usernameSeparator, text, params.maxCharsPerLine);
+        for (const auto &[name, text]: messages) {
+            auto [username, wrapped] = wrapMessage(name, params.usernameSeparator, text, params.maxCharsPerLine);
             if (wrapped.empty()) {
                 continue;
             }
             if (preview.size() < params.totalDisplayLines) {
-                preview.emplace_back(name, wrapped[0]);
+                preview.emplace_back(username, wrapped[0]);
             } else {
                 break;
             }

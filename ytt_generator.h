@@ -24,10 +24,12 @@
 #include "magic_enum.hpp"
 
 
+// Returns the number of UTF‑8 code points in s.
 int utf8_length(const std::string &s) {
     return static_cast<int>(utf8::distance(s.begin(), s.end()));
 }
 
+// Returns the first 'count' UTF‑8 code points of s.
 std::string utf8_substr(const std::string &s, int count) {
     auto it = s.begin();
     int i = 0;
@@ -35,7 +37,18 @@ std::string utf8_substr(const std::string &s, int count) {
         utf8::next(it, s.end());
         ++i;
     }
-    return std::string(s.begin(), it);
+    return {s.begin(), it};
+}
+
+// Returns the remainder of s after consuming the first 'count' UTF‑8 code points.
+std::string utf8_consume(const std::string &s, int count) {
+    auto it = s.begin();
+    int i = 0;
+    while (it != s.end() && i < count) {
+        utf8::next(it, s.end());
+        ++i;
+    }
+    return {it, s.end()};
 }
 
 template<typename T, T Max>
@@ -400,73 +413,70 @@ struct Batch {
     std::deque<ChatLine> lines;
 };
 
-
-std::vector<std::string> wrapText(const std::string &text, int maxChars, int prefixSize) {
+std::pair<std::string, std::vector<std::string>> wrapMessage(std::string username,
+                                                             std::string separator,
+                                                             const std::string &message,
+                                                             int maxWidth) {
     std::vector<std::string> lines;
-    if (text.empty() || maxChars <= 0 || prefixSize >= maxChars)
-        return lines;
+    int availableSpace = maxWidth;
+    if (utf8_length(username) > maxWidth) {
+        username = utf8_substr(username, maxWidth);
+        lines.push_back("");
+    } else {
+        availableSpace -= utf8_length(username);
+    }
+    if (utf8_length(separator) > availableSpace) {
+        separator = utf8_substr(separator, availableSpace);
+    }
+    if (utf8_length(separator) > 0) {
+        lines.push_back(separator);
+        availableSpace -= utf8_length(separator);
+    }
 
-    int firstLineMaxChars = maxChars - prefixSize;
-    std::istringstream iss(text);
+    std::istringstream iss(message);
+    std::vector<std::string> words;
     std::string word;
-    std::string line;
-    bool isFirstLine = true;
-
+    bool firstWord = true;
     while (iss >> word) {
-        int currentMaxChars = isFirstLine ? firstLineMaxChars : maxChars;
-        int lineLen = utf8_length(line);
-        int wordLen = utf8_length(word);
+        bool bigWord = false;
+        while (utf8_length(word) > maxWidth) {
+            bigWord = true;
+            if (availableSpace < 2) {
+                availableSpace = maxWidth;
+                lines.push_back(utf8_substr(word, availableSpace));
+                firstWord = false;
 
-        if (!line.empty() && (lineLen + 1 + wordLen > currentMaxChars)) {
-            lines.push_back(line);
-            line.clear();
-            isFirstLine = false;
-        }
+            } else {
 
-
-        if (wordLen > currentMaxChars) {
-            if (!line.empty()) {
-                lines.push_back(line);
-                line.clear();
-                isFirstLine = false;
-            }
-            auto wordIt = word.begin();
-            while (wordIt != word.end()) {
-                auto startIt = wordIt;
-                int count = 0;
-                while (wordIt != word.end() && count < currentMaxChars) {
-                    utf8::next(wordIt, word.end());
-                    ++count;
+                if (!firstWord) {
+                    lines.back() += " ";
+                    availableSpace--;
                 }
-                lines.emplace_back(startIt, wordIt);
-                currentMaxChars = maxChars;
-                isFirstLine = false;
+                lines.back() += utf8_substr(word, availableSpace);
+                firstWord = false;
             }
+            word = utf8_consume(word, availableSpace);// add split
+            availableSpace = 0;
+        }
+        if (bigWord) {
+            //if (utf8_length(word) < availableSpace) word += " ";
+            lines.push_back(word);
+            availableSpace = maxWidth - utf8_length(word);
+            firstWord = false;
             continue;
         }
-
-        if (!line.empty()) {
-            line.append(" ");
+        if (utf8_length(word) < availableSpace) {
+            if (!firstWord) lines.back() += " ";
+            lines.back() += word;
+            availableSpace -= utf8_length(word);
+        } else {
+            //if (utf8_length(word) < maxWidth) word += " ";
+            lines.push_back(word);
+            availableSpace = maxWidth - utf8_length(word);
         }
-        line.append(word);
+        firstWord = false;
     }
-
-    if (!line.empty())
-        lines.push_back(line);
-    return lines;
-}
-
-std::vector<std::string> wrapMessage(std::string &username,
-                                     const std::string &usernameSeparator,
-                                     const std::string &message,
-                                     int maxCharsPerLine) {
-    if (utf8_length(username) > maxCharsPerLine) {
-        int charsToKeep = maxCharsPerLine - utf8_length(usernameSeparator);
-        if (charsToKeep < 0) charsToKeep = 0;
-        username = utf8_substr(username, charsToKeep);
-
-    }
-    return wrapText(usernameSeparator + message, maxCharsPerLine, utf8_length(username));;
+    return {username, lines};
 }
 
 
@@ -483,8 +493,9 @@ std::string generateXML(const std::vector<ChatMessage> &messages, const ChatPara
     std::vector<Batch> batches;
     std::deque<ChatLine> currentLines;
     for (const auto &msg: messages) {
-        std::string username = msg.user.name;
-        auto wrapped = wrapMessage(username, params.usernameSeparator, msg.message, params.maxCharsPerLine);
+
+        auto [username, wrapped] = wrapMessage(msg.user.name, params.usernameSeparator, msg.message,
+                                               params.maxCharsPerLine);
         if (wrapped.empty())
             continue;
 
@@ -603,6 +614,28 @@ Color getRandomColor(const std::string &username) {
     std::hash<std::string> hasher;
     return defaultColors[hasher(username) % defaultColors.size()];
 
+}
+
+int test() {
+    // Example inputs.
+    std::string username = "Alice1234";
+    std::string separator = ": ";
+    std::string message = "Hello this is a long message that we will try to wrap correctly even if there are verylongwordswithoutanyspaces";
+    int maxWidth = 30;
+
+    auto [displayName, wrappedLines] = wrapMessage(username, separator, message, maxWidth);
+
+    // Print the results.
+    std::cout << "Username: " << displayName << "\n";
+    std::cout << "Message:\n";
+    // Print the full first line as it would appear when concatenated.
+    std::string fullFirstLine = displayName + wrappedLines[0];
+    std::cout << fullFirstLine << "|" << utf8_length(fullFirstLine) << "\n";
+    for (size_t i = 1; i < wrappedLines.size(); ++i) {
+        std::cout << wrappedLines[i] << "|" << utf8_length(wrappedLines[i]) << "\n";
+    }
+
+    return 0;
 }
 
 
