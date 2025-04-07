@@ -245,7 +245,7 @@ struct ChatParams {
 
     Color textForegroundColor = {254, 254, 254, 254};
     Color textBackgroundColor = {254, 254, 254, 0};
-    Color textEdgeColor = {254, 254, 254, 254};
+    Color textEdgeColor = {0, 0, 0, 254};
 
     EdgeType textEdgeType = EdgeType::SoftShadow;
     FontStyle fontStyle = FontStyle::MonospacedSans;
