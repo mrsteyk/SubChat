@@ -43,7 +43,7 @@ Example CSV:
 ```
 time,user_name,user_color,message
 1234567,User1,#FF0000,"Hello world!"
-1235000,User2,#00FF00,"Hi there!"
+1235000,User2,,"Hi there!"
 1240000,User1,#FF0000,"How are you?"
 ```
 
