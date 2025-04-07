@@ -171,7 +171,7 @@ int main(int, char **) {
     const char *glsl_version = "#version 130";
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-    GLFWwindow *window = glfwCreateWindow(1280, 720, "Dear ImGui Docking Example", nullptr, nullptr);
+    GLFWwindow *window = glfwCreateWindow(1280, 720, "SubChat Config Generator", nullptr, nullptr);
     if (window == nullptr)
         return 1;
     glfwMakeContextCurrent(window);
