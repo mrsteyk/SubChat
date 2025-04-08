@@ -177,6 +177,11 @@ int main(int, char **) {
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1);
 
+    if (NFD_Init() != NFD_OKAY) {
+        printf("Error: %s\n", NFD_GetError());
+        return 1;
+    }
+
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
@@ -314,6 +319,7 @@ int main(int, char **) {
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
+    NFD_Quit();
     glfwDestroyWindow(window);
     glfwTerminate();
     return 0;
