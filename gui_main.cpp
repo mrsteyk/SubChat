@@ -240,12 +240,32 @@ int main(int, char **) {
                     printf("Failed to load image: %s\n", outPath);
                 NFD_FreePathU8(outPath);
             } else if (result == NFD_CANCEL) {
-
+                // Do nothing
             } else {
                 printf("Error: %s\n", NFD_GetError());
             }
         }
         if (preview_texture == 0) ImGui::BeginDisabled();
+        if (ImGui::Button("Load Chat Logs for Preview")) {
+            nfdu8char_t *outPath = nullptr;
+            nfdu8filteritem_t filters[1] = {{"CSV files", "csv"}};
+            nfdopendialogu8args_t args = {0};
+            args.filterList = filters;
+            args.filterCount = 1;
+            // Set the parent window handle using the GLFW binding
+            //NFD_GetNativeWindowFromGLFWWindow(window, &args.parentWindow);
+            nfdresult_t result = NFD_OpenDialogU8_With(&outPath, &args);
+            if (result == NFD_OKAY) {
+                int multiplier = 1; // TODO: some way to customize time units
+                text_overlay.messages = parseCSV(outPath, multiplier);
+                text_overlay.revalidatePreview = true;
+                NFD_FreePathU8(outPath);
+            } else if (result == NFD_CANCEL) {
+                // Do nothing
+            } else {
+                printf("Error: %s\n", NFD_GetError());
+            }
+        }
         ImGui::SliderInt("X", &p.horizontalMargin, 0, 100);
         ImGui::SliderInt("Y", &p.verticalMargin, 0, 100);
         ImGui::SliderInt("Font size", &p.fontSizePercent, 0, 300);
