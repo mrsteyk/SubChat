@@ -567,13 +567,13 @@ std::string generateXML(const std::vector<ChatMessage> &messages, const ChatPara
         penIndex++;
     }
 
-    // Create workspace element for positioning.
+    // Create workspace element for whatever reason.
     XMLElement *ws = doc.NewElement("ws");
     ws->SetAttribute("id", "1"); // default workspace id
     ws->SetAttribute("ju", enumToIntString(params.textAlignment).c_str());
     head->InsertEndChild(ws);
 
-    // Create write positioning (wp) elements.
+    // Create window position (wp) elements.
     for (int i = 0; i < params.totalDisplayLines; ++i) {
         XMLElement *wp = doc.NewElement("wp");
         wp->SetAttribute("id", std::to_string(i).c_str());
