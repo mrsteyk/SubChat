@@ -5,15 +5,11 @@
 #include <iomanip>
 #include <string>
 #include <algorithm>
-#include <string>
 #include <vector>
 #include <map>
-#include <sstream>
-#include <iostream>
 #include <fstream>
-#include <algorithm>
-#include <iomanip>
 #include <cctype>
+#include <filesystem>
 #include <optional>
 #include <iterator>
 #include <queue>
@@ -22,15 +18,15 @@
 #include "tinyxml2.h"
 #include "SimpleIni.h"
 #include "magic_enum.hpp"
-
+#include <format>
 
 // Returns the number of UTF‑8 code points in s.
-int utf8_length(const std::string &s) {
+inline int utf8_length(const std::string &s) {
     return static_cast<int>(utf8::distance(s.begin(), s.end()));
 }
 
 // Returns the first 'count' UTF‑8 code points of s.
-std::string utf8_substr(const std::string &s, int count) {
+inline std::string utf8_substr(const std::string &s, int count) {
     auto it = s.begin();
     int i = 0;
     while (it != s.end() && i < count) {
@@ -41,7 +37,7 @@ std::string utf8_substr(const std::string &s, int count) {
 }
 
 // Returns the remainder of s after consuming the first 'count' UTF‑8 code points.
-std::string utf8_consume(const std::string &s, int count) {
+inline std::string utf8_consume(const std::string &s, int count) {
     auto it = s.begin();
     int i = 0;
     while (it != s.end() && i < count) {
@@ -55,7 +51,8 @@ template<typename T, T Max>
 struct Clamped {
     T value;
 
-    Clamped(T v = 0) : value(clamp(v)) {}
+    Clamped(T v = 0) : value(clamp(v)) {
+    }
 
     static T clamp(T v) {
         return (v > Max) ? Max : v;
@@ -72,7 +69,7 @@ struct Clamped {
 };
 
 struct Color {
-    static const int maxValue = 254;
+    static constexpr int maxValue = 254;
     typedef unsigned char cType;
 
     Clamped<cType, maxValue> r;
@@ -98,7 +95,7 @@ struct Color {
         }
 
         // Convert to uppercase for consistency
-        std::transform(cleaned.begin(), cleaned.end(), cleaned.begin(), ::toupper);
+        std::ranges::transform(cleaned, cleaned.begin(), ::toupper);
 
         // Support formats:
         // - #RGB : 3-digit, assume opaque (alpha = maxValue)
@@ -131,7 +128,8 @@ struct Color {
     Color() = default;
 
     Color(cType red, cType green, cType blue, cType alpha = maxValue)
-            : r(red), g(green), b(blue), a(alpha) {}
+        : r(red), g(green), b(blue), a(alpha) {
+    }
 
     Color(const std::string &hexCode) {
         parseHex(hexCode);
@@ -147,9 +145,9 @@ struct Color {
     std::string toHexString() const {
         std::stringstream ss;
         ss << '#' << std::uppercase << std::hex << std::setfill('0')
-           << std::setw(2) << static_cast<int>(r)
-           << std::setw(2) << static_cast<int>(g)
-           << std::setw(2) << static_cast<int>(b);
+                << std::setw(2) << static_cast<int>(r)
+                << std::setw(2) << static_cast<int>(g)
+                << std::setw(2) << static_cast<int>(b);
         if (a != maxValue) {
             ss << std::setw(2) << static_cast<int>(a);
         }
@@ -174,24 +172,47 @@ struct Color {
         if (b != other.b) return b < other.b;
         return a < other.a;
     }
+
+    std::string toAssColor() const {
+        std::stringstream ss;
+        ss << "{\\c&H"
+                << std::uppercase << std::hex << std::setfill('0')
+                << std::setw(2) << static_cast<int>(b)
+                << std::setw(2) << static_cast<int>(g)
+                << std::setw(2) << static_cast<int>(r)
+                << "&";
+
+        // Here we check if alpha is not equal to maxValue (opaque).
+        // If you want to force output alpha, simply output it.
+        if (a != maxValue) {
+            ss << "\\a&H"
+                    << std::setw(2) << static_cast<int>(a)
+                    << "&";
+        }
+        ss << "}";
+        return ss.str();
+    }
 };
 
 enum class HorizontalAlignment {
     Left, Center, Right
 };
+
 enum class FontStyle {
     Default,
-    Monospaced,   // Courier New
-    Proportional,        // Times New Roman
-    MonospacedSans,    // Lucida Console
-    ProportionalSans,       // Roboto
-    Casual,      // Comic Sans!
-    Cursive,    // Monotype Corsiva
+    Monospaced, // Courier New
+    Proportional, // Times New Roman
+    MonospacedSans, // Lucida Console
+    ProportionalSans, // Roboto
+    Casual, // Comic Sans!
+    Cursive, // Monotype Corsiva
     SmallCapitals // (Arial with font-variant: small-caps)
 };
+
 enum class EdgeType {
     None, HardShadow, Bevel, GlowOutline, SoftShadow
 };
+
 enum class TextAlignment {
     Left, Right, Center
 };
@@ -201,8 +222,8 @@ template<typename E>
 std::string enumToString(E e) {
     auto name = magic_enum::enum_name(e);
     return name.empty()
-           ? std::to_string(static_cast<std::underlying_type_t<E>>(e))
-           : std::string(name);
+               ? std::to_string(static_cast<std::underlying_type_t<E>>(e))
+               : std::string(name);
 }
 
 template<typename E>
@@ -214,15 +235,14 @@ E enumFromString(const std::string &s) {
         return static_cast<E>(i);
     } catch (...) {
         throw std::invalid_argument(
-                "Invalid " + std::string(magic_enum::enum_type_name<E>())
-                + " value: '" + s + "'");
+            "Invalid " + std::string(magic_enum::enum_type_name<E>())
+            + " value: '" + s + "'");
     }
 }
 
 template<typename E>
 std::string enumToIntString(E e) {
     return std::to_string(magic_enum::enum_integer(e));
-
 }
 
 template<typename E>
@@ -254,7 +274,7 @@ struct ChatParams {
     TextAlignment textAlignment = TextAlignment::Left;
     int horizontalMargin = 71;
     int verticalMargin = 0;
-    int verticalSpacing = 4;
+    int verticalSpacing = -1;
     int totalDisplayLines = 13;
 
     int maxCharsPerLine = 25;
@@ -276,38 +296,33 @@ struct ChatParams {
 
         // colors with format comment
         {
-            auto hf = textForegroundColor.toHexString();
+            const auto hf = textForegroundColor.toHexString();
             ini.SetValue(S, "textForegroundColor", hf.c_str(),
                          ";Hex color: #RGB, #RGBA, #RRGGBB or #RRGGBBAA");
-        }
-        {
-            auto hb = textBackgroundColor.toHexString();
+        } {
+            const auto hb = textBackgroundColor.toHexString();
             ini.SetValue(S, "textBackgroundColor", hb.c_str(),
                          ";Hex color: #RGB, #RGBA, #RRGGBB or #RRGGBBAA");
-        }
-        {
-            auto he = textEdgeColor.toHexString();
+        } {
+            const auto he = textEdgeColor.toHexString();
             ini.SetValue(S, "textEdgeColor", he.c_str(),
                          ";Hex color: #RGB, #RGBA, #RRGGBB or #RRGGBBAA");
         }
 
         // enums with generated option lists
         {
-            auto val = enumToString(textEdgeType);
-            auto cm = enumOptionsComment<EdgeType>();
+            const auto val = enumToString(textEdgeType);
+            const auto cm = enumOptionsComment<EdgeType>();
             ini.SetValue(S, "textEdgeType", val.c_str(), cm.c_str());
-        }
-        {
-            auto val = enumToString(fontStyle);
-            auto cm = enumOptionsComment<FontStyle>();
+        } {
+            const auto val = enumToString(fontStyle);
+            const auto cm = enumOptionsComment<FontStyle>();
             ini.SetValue(S, "fontStyle", val.c_str(), cm.c_str());
         }
         ini.SetLongValue(S, "fontSizePercent", fontSizePercent,
-                         ";0–300 (virtual percent)");
-
-        {
-            auto val = enumToString(textAlignment);
-            auto cm = enumOptionsComment<TextAlignment>();
+                         ";0–300 (virtual percent)"); {
+            const auto val = enumToString(textAlignment);
+            const auto cm = enumOptionsComment<TextAlignment>();
             ini.SetValue(S, "textAlignment", val.c_str(), cm.c_str());
         }
         ini.SetLongValue(S, "horizontalMargin", horizontalMargin,
@@ -328,7 +343,6 @@ struct ChatParams {
     }
 
     bool loadFromFile(const char *filename) {
-
         CSimpleIniCaseA ini;
         ini.SetUnicode();
         ini.SetQuotes();
@@ -342,56 +356,56 @@ struct ChatParams {
 
         // colors
         textForegroundColor = Color{
-                ini.GetValue(S, "textForegroundColor",
-                             textForegroundColor.toHexString().c_str())
+            ini.GetValue(S, "textForegroundColor",
+                         textForegroundColor.toHexString().c_str())
         };
         textBackgroundColor = Color{
-                ini.GetValue(S, "textBackgroundColor",
-                             textBackgroundColor.toHexString().c_str())
+            ini.GetValue(S, "textBackgroundColor",
+                         textBackgroundColor.toHexString().c_str())
         };
         textEdgeColor = Color{
-                ini.GetValue(S, "textEdgeColor",
-                             textEdgeColor.toHexString().c_str())
+            ini.GetValue(S, "textEdgeColor",
+                         textEdgeColor.toHexString().c_str())
         };
 
         // enums (fallback via default string)
         try {
             textEdgeType = enumFromString<EdgeType>(
-                    ini.GetValue(S, "textEdgeType",
-                                 enumToString(textEdgeType).c_str()));
+                ini.GetValue(S, "textEdgeType",
+                             enumToString(textEdgeType).c_str()));
         } catch (...) {
         }
         try {
             fontStyle = enumFromString<FontStyle>(
-                    ini.GetValue(S, "fontStyle",
-                                 enumToString(fontStyle).c_str()));
+                ini.GetValue(S, "fontStyle",
+                             enumToString(fontStyle).c_str()));
         } catch (...) {
         }
         try {
             textAlignment = enumFromString<TextAlignment>(
-                    ini.GetValue(S, "textAlignment",
-                                 enumToString(textAlignment).c_str()));
+                ini.GetValue(S, "textAlignment",
+                             enumToString(textAlignment).c_str()));
         } catch (...) {
         }
         fontSizePercent = static_cast<int>(
-                ini.GetLongValue(S, "fontSizePercent",
-                                 fontSizePercent));
+            ini.GetLongValue(S, "fontSizePercent",
+                             fontSizePercent));
         horizontalMargin = static_cast<int>(
-                ini.GetLongValue(S, "horizontalMargin",
-                                 horizontalMargin));
+            ini.GetLongValue(S, "horizontalMargin",
+                             horizontalMargin));
         verticalMargin = static_cast<int>(
-                ini.GetLongValue(S, "verticalMargin",
-                                 verticalMargin));
+            ini.GetLongValue(S, "verticalMargin",
+                             verticalMargin));
         verticalSpacing = static_cast<int>(
-                ini.GetLongValue(S, "verticalSpacing",
-                                 verticalSpacing));
+            ini.GetLongValue(S, "verticalSpacing",
+                             verticalSpacing));
         totalDisplayLines = static_cast<int>(
-                ini.GetLongValue(S, "totalDisplayLines",
-                                 totalDisplayLines));
+            ini.GetLongValue(S, "totalDisplayLines",
+                             totalDisplayLines));
 
         maxCharsPerLine = static_cast<int>(
-                ini.GetLongValue(S, "maxCharsPerLine",
-                                 maxCharsPerLine));
+            ini.GetLongValue(S, "maxCharsPerLine",
+                             maxCharsPerLine));
         usernameSeparator = ini.GetValue(S, "usernameSeparator",
                                          usernameSeparator.c_str());
 
@@ -425,10 +439,10 @@ struct Batch {
     std::deque<ChatLine> lines;
 };
 
-std::pair<std::string, std::vector<std::string>> wrapMessage(std::string username,
-                                                             std::string separator,
-                                                             const std::string &message,
-                                                             int maxWidth) {
+inline std::pair<std::string, std::vector<std::string> > wrapMessage(std::string username,
+                                                                     std::string separator,
+                                                                     const std::string &message,
+                                                                     int maxWidth) {
     std::vector<std::string> lines;
     int availableSpace = maxWidth;
     if (utf8_length(username) > maxWidth) {
@@ -437,13 +451,13 @@ std::pair<std::string, std::vector<std::string>> wrapMessage(std::string usernam
     } else {
         availableSpace -= utf8_length(username);
     }
+
     if (utf8_length(separator) > availableSpace) {
         separator = utf8_substr(separator, availableSpace);
     }
-    if (utf8_length(separator) > 0) {
-        lines.push_back(separator);
-        availableSpace -= utf8_length(separator);
-    }
+    lines.push_back(separator);
+    availableSpace -= utf8_length(separator);
+
 
     std::istringstream iss(message);
     std::vector<std::string> words;
@@ -457,9 +471,7 @@ std::pair<std::string, std::vector<std::string>> wrapMessage(std::string usernam
                 availableSpace = maxWidth;
                 lines.push_back(utf8_substr(word, availableSpace));
                 firstWord = false;
-
             } else {
-
                 if (!firstWord) {
                     lines.back() += " ";
                     availableSpace--;
@@ -467,7 +479,7 @@ std::pair<std::string, std::vector<std::string>> wrapMessage(std::string usernam
                 lines.back() += utf8_substr(word, availableSpace);
                 firstWord = false;
             }
-            word = utf8_consume(word, availableSpace);// add split
+            word = utf8_consume(word, availableSpace); // add split
             availableSpace = 0;
         }
         if (bigWord) {
@@ -491,27 +503,16 @@ std::pair<std::string, std::vector<std::string>> wrapMessage(std::string usernam
         }
         firstWord = false;
     }
-//    for (const auto& line :lines){
-//        assert(utf8_length(line)<=maxWidth);
-//    }
+    //    for (const auto& line :lines){
+    //        assert(utf8_length(line)<=maxWidth);
+    //    }
     return {username, lines};
 }
 
-
-std::string generateXML(const std::vector<ChatMessage> &messages, const ChatParams &params) {
-    using namespace tinyxml2;
-    XMLDocument doc;
-
-    std::map<Color, std::string> colors;
-    colors[params.textForegroundColor] = "";
-    for (const auto &m: messages) {
-        colors[m.user.color] = "";
-    }
-
+inline std::vector<Batch> generateBatches(const std::vector<ChatMessage> &messages, const ChatParams &params) {
     std::vector<Batch> batches;
     std::deque<ChatLine> currentLines;
     for (const auto &msg: messages) {
-
         auto [username, wrapped] = wrapMessage(msg.user.name, params.usernameSeparator, msg.message,
                                                params.maxCharsPerLine);
         if (wrapped.empty())
@@ -526,6 +527,21 @@ std::string generateXML(const std::vector<ChatMessage> &messages, const ChatPara
         if (!batches.empty() && batches.back().time == msg.time)
             continue;
         batches.emplace_back(msg.time, currentLines);
+    }
+    return batches;
+}
+
+inline std::string generateXML(const std::vector<Batch> &batches, const ChatParams &params) {
+    using namespace tinyxml2;
+    XMLDocument doc;
+
+    std::map<Color, std::string> colors;
+    colors[params.textForegroundColor] = "";
+    // Not optimal, but I want to factor out messages
+    for (const auto &m: batches) {
+        for (const auto &l: m.lines) {
+            if (l.user.has_value())colors[l.user->color] = "";
+        }
     }
 
     XMLElement *root = doc.NewElement("timedtext");
@@ -583,39 +599,65 @@ std::string generateXML(const std::vector<ChatMessage> &messages, const ChatPara
         head->InsertEndChild(wp);
     }
     // Zero-width space (ZWSP) as a UTF-8 string.
-    const char *ZWSP = "\xE2\x80\x8B";
-
-    // Build the body: add <p> elements from each batch;
+    auto defaultPen = colors[params.textForegroundColor];
+    constexpr const char *ZWSP = "\xE2\x80\x8B";
     for (size_t batchIndex = 0; batchIndex + 1 < batches.size(); ++batchIndex) {
         const Batch &batch = batches[batchIndex];
         const Batch &nextBatch = batches[batchIndex + 1];
-        auto defaultPen = colors[params.textForegroundColor];
-        for (const auto &[idx, line]: batch.lines | std::ranges::views::enumerate) {
+        if (params.verticalSpacing == -1) {
             XMLElement *pElem = doc.NewElement("p");
             pElem->SetAttribute("t", std::to_string(batch.time).c_str());
             int duration = nextBatch.time - batch.time;
             pElem->SetAttribute("d", std::to_string(duration).c_str());
-            pElem->SetAttribute("wp", std::to_string(idx).c_str());
+            pElem->SetAttribute("wp", "0");
             pElem->SetAttribute("ws", "1");
             pElem->SetAttribute("p", defaultPen.c_str());
-
             pElem->LinkEndChild(doc.NewText(""));
-            if (line.user.has_value()) {
-                XMLElement *sUser = doc.NewElement("s");
-                sUser->SetAttribute("p", colors[line.user->color].c_str());
-                std::string userText = line.user->name;
-                sUser->SetText(userText.c_str());
-                pElem->InsertEndChild(sUser);
-                pElem->LinkEndChild(doc.NewText(ZWSP));
+
+            for (const auto &[idx, line]: batch.lines | std::ranges::views::enumerate) {
+                if (line.user.has_value()) {
+                    XMLElement *sUser = doc.NewElement("s");
+                    sUser->SetAttribute("p", colors[line.user->color].c_str());
+                    std::string userText = line.user->name;
+                    sUser->SetText(userText.c_str());
+                    pElem->InsertEndChild(sUser);
+                    pElem->LinkEndChild(doc.NewText(ZWSP));
+                }
+                XMLElement *sText = doc.NewElement("s");
+                sText->SetAttribute("p", defaultPen.c_str());
+                sText->SetText(line.text.c_str());
+                pElem->InsertEndChild(sText);
+                pElem->LinkEndChild(doc.NewText("\n"));
             }
-
-            XMLElement *sText = doc.NewElement("s");
-            sText->SetAttribute("p", defaultPen.c_str());
-            sText->SetText(line.text.c_str());
-            pElem->InsertEndChild(sText);
-            pElem->LinkEndChild(doc.NewText(""));
-
             body->InsertEndChild(pElem);
+        } else {
+            for (const auto &[idx, line]: batch.lines | std::ranges::views::enumerate) {
+                XMLElement *pElem = doc.NewElement("p");
+                pElem->SetAttribute("t", std::to_string(batch.time).c_str());
+                int duration = nextBatch.time - batch.time;
+                pElem->SetAttribute("d", std::to_string(duration).c_str());
+                pElem->SetAttribute("wp", std::to_string(idx).c_str());
+                pElem->SetAttribute("ws", "1");
+                pElem->SetAttribute("p", defaultPen.c_str());
+
+                pElem->LinkEndChild(doc.NewText(""));
+                if (line.user.has_value()) {
+                    XMLElement *sUser = doc.NewElement("s");
+                    sUser->SetAttribute("p", colors[line.user->color].c_str());
+                    std::string userText = line.user->name;
+                    sUser->SetText(userText.c_str());
+                    pElem->InsertEndChild(sUser);
+                    pElem->LinkEndChild(doc.NewText(ZWSP));
+                }
+
+                XMLElement *sText = doc.NewElement("s");
+                sText->SetAttribute("p", defaultPen.c_str());
+                sText->SetText(line.text.c_str());
+                pElem->InsertEndChild(sText);
+                pElem->LinkEndChild(doc.NewText(""));
+
+                body->InsertEndChild(pElem);
+            }
         }
     }
 
@@ -625,17 +667,18 @@ std::string generateXML(const std::vector<ChatMessage> &messages, const ChatPara
 }
 
 
-Color getRandomColor(const std::string &username) {
-    std::vector<Color> defaultColors = {"#ff0000", "#0000ff", "#008000", "#b22222", "#ff7f50",
-                                        "#9acd32", "#ff4500", "#2e8b57", "#daa520", "#d2691e",
-                                        "#5f9ea0", "#1e90ff", "#ff69b4", "#8a2be2", "#00ff7f"};
+inline Color getRandomColor(const std::string &username) {
+    std::vector<Color> defaultColors = {
+        "#ff0000", "#0000ff", "#008000", "#b22222", "#ff7f50",
+        "#9acd32", "#ff4500", "#2e8b57", "#daa520", "#d2691e",
+        "#5f9ea0", "#1e90ff", "#ff69b4", "#8a2be2", "#00ff7f"
+    };
     std::hash<std::string> hasher;
     return defaultColors[hasher(username) % defaultColors.size()];
-
 }
 
 // dumb and simple way to parse CSV
-std::vector<ChatMessage> parseCSV(const std::string &filename, int timeMultiplier) {
+inline std::vector<ChatMessage> parseCSV(const std::filesystem::path &filename, int timeMultiplier) {
     std::vector<ChatMessage> messages;
     std::ifstream file(filename);
     std::string line;
@@ -676,4 +719,151 @@ std::vector<ChatMessage> parseCSV(const std::string &filename, int timeMultiplie
     }
 
     return messages;
+}
+
+inline float realFontScale(int yttFontSize) {
+    return static_cast<float>((100.0 + (yttFontSize - 100.0) / 4.0) / 100.0);
+}
+
+
+inline double assFontSize(const int yttFontSize, const int assHeight) {
+    return (realFontScale(yttFontSize) * 64.107) / 1440.0 * static_cast<double>(assHeight);
+}
+
+inline double assX(int yttX, const int yttFontSize, const int assWidth) {
+    return (51.2821 + 24.5844 * yttX + 15.9109 * realFontScale(yttFontSize)) * assWidth / 2560.0;
+}
+
+inline double assY(const int yttY, const int yttFontSize, const int assHeight, const uint32_t line = 0) {
+    //     double rFontScale = realFontScale(yttFontSize);
+    //
+    // //    double lC = 3.4442 * rFontScale * rFontScale * rFontScale
+    // //                - 8.3489 * rFontScale * rFontScale
+    // //                + 74.5018 * rFontScale - 1.6156;
+    // //    double lC = 3.4441851202 * rFontScale * rFontScale * rFontScale
+    // //                - 8.3488610000 * rFontScale * rFontScale
+    // //                + 74.5018286601 * rFontScale - 1.6155972200;
+    //     double lC = 5.1862772740 * rFontScale * rFontScale * rFontScale
+    //                 - 14.1350956536 * rFontScale * rFontScale
+    //                 + 80.4294668977 * rFontScale - 3.3718297322;
+    const int yttY2 = yttY * yttY;
+    const int yttY3 = yttY2 * yttY;
+    const double fScale = realFontScale(yttFontSize);
+    const double fScale2 = fScale * fScale;
+
+    return ((0.0000036448 * fScale - 0.0000102298) * yttY3 +
+            (0.0001228929 * fScale + 0.0006313481) * yttY2 +
+            (-0.0299080260 * fScale + 13.8373127706) * yttY +
+            (2.3156363636 * fScale2 - 2.1625454545 * fScale + 30.1938181818) +
+            (2.095321207 * fScale2 + 64.752581827 * fScale + 1.158860604) * line
+           ) * assHeight / 1440.0;
+}
+
+
+static std::string formatTime(uint64_t ms) {
+    uint64_t total = ms / 10;
+    uint64_t h = total / 360000;
+    uint64_t m = (total / 6000) % 60;
+    uint64_t s = (total / 100) % 60;
+    uint64_t cs = total % 100;
+    return std::format("{}:{:02}:{:02}.{:02}", h, m, s, cs);
+}
+
+static std::string escapeText(const std::string &raw) {
+    std::string out;
+    out.reserve(raw.size());
+    for (char c: raw) {
+        switch (c) {
+            case '\\':
+                out += "\\\\";
+                break;
+            case '{':
+                out += "\\{";
+                break;
+            case '}':
+                out += "\\}";
+                break;
+            case '\n':
+                out += "\\n";
+                break;
+            //TODO Improve this
+            default:
+                out += c;
+                break;
+        }
+    }
+    return out;
+}
+
+
+inline std::string generateAss(const std::vector<Batch> &batches,
+                               const ChatParams &chat_params,
+                               int video_width, int video_height) {
+    static constexpr std::string_view header =
+            "\xEF\xBB\xBF" // BOM
+            "[Script Info]\n";
+    static constexpr std::string_view info =
+            "\n; Script generated by Kam1k4dze's SubChat\n"
+            "Title: SubChat preview\n"
+            "ScriptType: v4.00+\n"
+            "WrapStyle: 2\n"
+            "ScaledBorderAndShadow: yes\n"
+            "YCbCr Matrix: None\n";
+    static constexpr std::string_view stylesHeader =
+            "[V4+ Styles]\n"
+            "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, "
+            "Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, "
+            "Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n";
+    static constexpr std::string_view eventsHeader =
+            "[Events]\n"
+            "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n";
+
+    static std::string ass;
+    ass.clear();
+    ass += header;
+    ass += info;
+    ass += std::format("PlayResX: {}\nPlayResY: {}\nLayoutResX: {}\nLayoutResY: {}\n\n",
+                       video_width, video_height, video_width, video_height);
+    ass += stylesHeader;
+    float fontSize = assFontSize(chat_params.fontSizePercent, video_height);
+    ass += std::format(
+        "Style: Default,Lucida Console,{:.2f},&H00000000,&H000000FF,&H00000000,&H00000000,"
+        "0,0,0,0,100,100,0,0,1,0,2.5,7,0,0,0,1\n\n",
+        fontSize
+    );
+    ass += eventsHeader;
+    double posX = assX(chat_params.horizontalMargin, chat_params.fontSizePercent, video_width);
+    size_t maxLines = chat_params.totalDisplayLines;
+    std::vector<double> posY(maxLines);
+    for (size_t idx = 0; idx < maxLines; ++idx) {
+        posY[idx] = (chat_params.verticalSpacing < 0)
+                        ? assY(chat_params.verticalMargin, chat_params.fontSizePercent, video_height, idx)
+                        : assY(chat_params.verticalMargin + chat_params.verticalSpacing * idx,
+                               chat_params.fontSizePercent, video_height);
+    }
+
+    for (size_t i = 0; i + 1 < batches.size(); ++i) {
+        const auto &curr = batches[i];
+        const auto &next = batches[i + 1];
+        auto start = formatTime(curr.time);
+        auto end = formatTime(next.time);
+
+        for (size_t idx = 0; idx < curr.lines.size(); ++idx) {
+            const auto &line = curr.lines[idx];
+            std::format_to(std::back_inserter(ass),
+                           "Dialogue: 0,{},{},Default,,0,0,0,,{{\\pos({:.3f},{:.3f})}}",
+                           start, end, posX, posY[idx]
+            );
+
+            if (line.user) {
+                ass += line.user->color.toAssColor();
+                ass += escapeText(line.user->name);
+            }
+            ass += chat_params.textForegroundColor.toAssColor();
+            ass += escapeText(line.text);
+            ass += '\n';
+        }
+    }
+
+    return ass;
 }

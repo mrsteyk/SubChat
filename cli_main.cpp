@@ -8,7 +8,7 @@
 int main(int argc, char *argv[]) {
     CLI::App app{"Chat → YTT/SRV3 subtitle generator"};
 
-    std::string configPath, csvPath, outputPath;
+    std::filesystem::path configPath, csvPath, outputPath;
     std::string timeUnit;
 
     app.add_option("-c,--config", configPath, "Path to INI config file")
@@ -39,7 +39,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    std::string xml = generateXML(chat, params);
+    std::string xml = generateXML(generateBatches(chat,params), params);
 
     std::ofstream out(outputPath);
     if (!out) {
