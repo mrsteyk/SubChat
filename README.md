@@ -1,8 +1,10 @@
 # SubChat
 
 SubChat is a command-line and GUI toolset for generating YouTube subtitles from chat logs.
-
-**IMPORTANT:** Currently, only YouTube in desktop browsers is supported.
+> [!IMPORTANT]
+> The YouTube mobile app renders subtitles differently and completely ignores subtitle font settings, so your viewers should manually adjust their subtitle font settings in YouTube’s settings.
+>
+> Also, subtitle positioning in the mobile app is slightly different.
 
 ![Tsoding](example/result.jpg)
 Chat on this screenshot was created entirely using YouTube subtitles.
